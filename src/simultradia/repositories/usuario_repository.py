@@ -1,5 +1,5 @@
 """Acceso a la tabla "usuarios". Aquí vive TODO el SQL relacionado con usuarios."""
-from typing import Optional
+from typing import List, Optional
 
 import psycopg2
 
@@ -9,7 +9,7 @@ from simultradia.domain.enums import RolUsuario
 
 _COLUMNAS = (
     "id_usuario, nombre, email, password_hash, rol, activo, "
-    "ultimo_login_en, creado_en, actualizado_en"
+    "ultimo_login_en, creado_en, actualizado_en, debe_cambiar_password"
 )
 
 
@@ -27,6 +27,17 @@ class UsuarioRepository:
             )
             fila = cur.fetchone()
         return self._a_entidad(fila) if fila else None
+
+    def buscar_por_id(self, conn, id_usuario: int) -> Optional[Usuario]:
+        with conn.cursor() as cur:
+            cur.execute("SELECT " + _COLUMNAS + " FROM usuarios WHERE id_usuario = %s", (id_usuario,))
+            fila = cur.fetchone()
+        return self._a_entidad(fila) if fila else None
+
+    def listar(self, conn) -> List[Usuario]:
+        with conn.cursor() as cur:
+            cur.execute("SELECT " + _COLUMNAS + " FROM usuarios ORDER BY id_usuario")
+            return [self._a_entidad(fila) for fila in cur.fetchall()]
 
     def insertar(self, conn, usuario: Usuario) -> Usuario:
         try:
@@ -56,6 +67,22 @@ class UsuarioRepository:
                 (id_usuario,),
             )
 
+    def establecer_activo(self, conn, id_usuario: int, activo: bool) -> bool:
+        """Activa o desactiva una cuenta. Devuelve False si el usuario no existe."""
+        with conn.cursor() as cur:
+            cur.execute("UPDATE usuarios SET activo = %s WHERE id_usuario = %s",
+                        (activo, id_usuario))
+            return cur.rowcount > 0
+
+    def actualizar_password(self, conn, id_usuario: int, password_hash: str, debe_cambiar: bool) -> bool:
+        """Guarda un hash nuevo. `debe_cambiar` marca si la contraseña es temporal. False si no existe."""
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE usuarios SET password_hash = %s, debe_cambiar_password = %s WHERE id_usuario = %s",
+                (password_hash, debe_cambiar, id_usuario),
+            )
+            return cur.rowcount > 0
+
     @staticmethod
     def _a_entidad(fila) -> Usuario:
         """Convierte una fila de PostgreSQL (namedtuple) en un objeto Usuario."""
@@ -69,4 +96,5 @@ class UsuarioRepository:
             ultimo_login_en=fila.ultimo_login_en,
             creado_en=fila.creado_en,
             actualizado_en=fila.actualizado_en,
+            debe_cambiar_password=fila.debe_cambiar_password,
         )

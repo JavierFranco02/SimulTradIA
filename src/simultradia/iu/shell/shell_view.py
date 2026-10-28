@@ -4,6 +4,7 @@ Vista pasiva. Las secciones (inicio, mercado...) se dibujan dentro de `contenido
 quién las crea y las cambia es el Navegador. Cumple su protocolo:
     contenido                 -> Frame donde van las secciones
     marcar_seccion(nombre)    -> resalta la sección activa del menú
+Los administradores ven, debajo del menú normal, un bloque "ADMINISTRACIÓN".
 """
 from typing import Callable, Dict, Optional, Sequence, Tuple
 
@@ -16,8 +17,9 @@ from simultradia.iu.styles import ButtonStyle, Colors, Fonts, Spacing
 
 
 class ShellView(ttk.Frame):
-    def __init__(self, parent, usuario: Usuario, menu: Sequence[Tuple[str, str]]):
-        """`menu` es una lista de (nombre de la pantalla, texto del botón)."""
+    def __init__(self, parent, usuario: Usuario, menu: Sequence[Tuple[str, str]],
+                 menu_admin: Sequence[Tuple[str, str]] = ()):
+        """`menu` y `menu_admin` son listas de (nombre de la pantalla, texto del botón)."""
         super().__init__(parent)
         self._al_elegir_seccion: Optional[Callable[[str], None]] = None
         self._al_cerrar_sesion: Optional[Callable[[], None]] = None
@@ -44,6 +46,13 @@ class ShellView(ttk.Frame):
 
         ttk.Label(barra, text=SETTINGS.app.name, font=Fonts.HEADING,
                   bootstyle=Colors.PRIMARY).pack(anchor="w", pady=(0, Spacing.LG))
+        self._agregar_botones(barra, menu)
+        if menu_admin:
+            ttk.Label(barra, text="ADMINISTRACIÓN", font=Fonts.SMALL,
+                      bootstyle=Colors.MUTED).pack(anchor="w", pady=(Spacing.LG, Spacing.XS))
+            self._agregar_botones(barra, menu_admin)
+
+    def _agregar_botones(self, barra, menu: Sequence[Tuple[str, str]]) -> None:
         for nombre, etiqueta in menu:
             boton = ActionButton(barra, etiqueta, lambda n=nombre: self._pulsar_seccion(n),
                                  estilo=ButtonStyle.LINK)

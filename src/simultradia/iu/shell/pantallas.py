@@ -9,13 +9,18 @@ from simultradia.iu.shell.shell_view import ShellView
 # (nombre de la pantalla, texto del botón, solo administrador)
 _MENU = (
     ("inicio", "Inicio", False),
+    ("mercado", "Mercado", False),
+    ("admin_usuarios", "Usuarios", True),
+    ("admin_activos", "Activos", True),
+    ("admin_ingesta", "Ingesta de datos", True),
 )
 
 
 def _home(padre, nav):
-    menu = [(nombre, texto) for nombre, texto, solo_admin in _MENU
-            if nav.session.es_admin or not solo_admin]
-    vista = ShellView(padre, nav.session.usuario, menu)
+    menu = [(nombre, texto) for nombre, texto, solo_admin in _MENU if not solo_admin]
+    menu_admin = [(nombre, texto) for nombre, texto, solo_admin in _MENU
+                  if solo_admin and nav.session.es_admin]
+    vista = ShellView(padre, nav.session.usuario, menu, menu_admin)
     ShellController(vista, nav.session, nav)
     return vista
 

@@ -34,6 +34,10 @@ class LoginController(FormController):
     def _al_autenticar(self, usuario) -> None:
         # Solo se llega aquí si el usuario sigue en esta pantalla (lo garantiza _ejecutar),
         # así que la sesión nunca se abre "a escondidas" desde una pantalla que ya se dejó.
+        if usuario.debe_cambiar_password:
+            # Entró con una contraseña temporal: primero debe elegir una nueva. No se abre sesión.
+            self._navegador.ir_a("cambiar_password", email=usuario.email)
+            return
         self._session.iniciar(usuario)
         self._navegador.ir_a("home")
 

@@ -127,6 +127,60 @@ class PruebasUsuarioService(unittest.TestCase):
         with self.assertRaises(CredencialesInvalidas):
             self.servicio.autenticar("ana@correo.com", "corta")
 
+    def test_un_usuario_con_contrasena_temporal_se_autentica_pero_queda_marcado(self):
+        u = self.servicio.registrar("Ana", "ana@correo.com", CLAVE, CLAVE)
+        self.assertFalse(u.debe_cambiar_password)
+        u.debe_cambiar_password = True
+        self.assertTrue(self.servicio.autenticar("ana@correo.com", CLAVE).debe_cambiar_password)
+
+    # ------------------------------------------------- contraseña temporal
+    def _con_temporal(self):
+        u = self.servicio.registrar("Ana", "ana@correo.com", "Temporal123", "Temporal123")
+        u.debe_cambiar_password = True
+        return u
+
+    def test_cambiar_la_contrasena_temporal(self):
+        u = self._con_temporal()
+        resultado = self.servicio.cambiar_password_temporal(" ANA@correo.com ", "Temporal123", "Nueva-Clave-9", "Nueva-Clave-9")
+        self.assertFalse(resultado.debe_cambiar_password)
+        self.assertFalse(u.debe_cambiar_password)
+        self.assertNotEqual(u.password_hash, "Temporal123")
+        self.servicio.autenticar("ana@correo.com", "Nueva-Clave-9")          # la nueva funciona
+        with self.assertRaises(CredencialesInvalidas):
+            self.servicio.autenticar("ana@correo.com", "Temporal123")        # la temporal ya no
+
+    def test_cada_error_del_cambio_indica_su_campo(self):
+        self._con_temporal()
+        casos = [
+            (("", "Nueva-Clave-9", "Nueva-Clave-9"), "actual"),
+            (("Temporal123", "corta", "corta"), "password"),
+            (("Temporal123", "Nueva-Clave-9", "otra-cosa"), "confirmacion"),
+            (("Temporal123", "Temporal123", "Temporal123"), "password"),     # igual a la temporal
+        ]
+        for datos, campo in casos:
+            with self.subTest(datos=datos):
+                errores = self._errores(self.servicio.cambiar_password_temporal, "ana@correo.com", *datos)
+                self.assertEqual(list(errores), [campo])
+
+    def test_con_la_temporal_equivocada_o_un_email_inexistente_es_credenciales_invalidas(self):
+        self._con_temporal()
+        with self.assertRaises(CredencialesInvalidas):
+            self.servicio.cambiar_password_temporal("ana@correo.com", "no-es-esa-1", "Nueva-Clave-9", "Nueva-Clave-9")
+        with self.assertRaises(CredencialesInvalidas):
+            self.servicio.cambiar_password_temporal("nadie@correo.com", "Temporal123", "Nueva-Clave-9", "Nueva-Clave-9")
+
+    def test_solo_funciona_si_hay_un_cambio_pendiente(self):
+        u = self.servicio.registrar("Ana", "ana@correo.com", CLAVE, CLAVE)      # contraseña normal
+        with self.assertRaises(CredencialesInvalidas):
+            self.servicio.cambiar_password_temporal("ana@correo.com", CLAVE, "Nueva-Clave-9", "Nueva-Clave-9")
+        self.servicio.autenticar("ana@correo.com", CLAVE)                       # la contraseña no cambió
+
+    def test_una_cuenta_desactivada_no_puede_cambiarla(self):
+        u = self._con_temporal()
+        u.activo = False
+        with self.assertRaises(CuentaDesactivada):
+            self.servicio.cambiar_password_temporal("ana@correo.com", "Temporal123", "Nueva-Clave-9", "Nueva-Clave-9")
+
 
 if __name__ == "__main__":
     unittest.main()

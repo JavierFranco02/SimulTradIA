@@ -14,6 +14,14 @@ class ErrorBaseDatos(ErrorAplicacion):
     """No se pudo hablar con PostgreSQL."""
 
 
+class ErrorServicioExterno(ErrorAplicacion):
+    """No se pudo hablar con una API de afuera (Binance...)."""
+
+
+class ErrorOperacionInvalida(ErrorAplicacion):
+    """La acción pedida no se puede hacer (por ejemplo, desactivarse a uno mismo)."""
+
+
 class ErrorPermisos(ErrorAplicacion):
     """Quien pide la acción no tiene permiso para hacerla (por ejemplo, no es administrador)."""
 
