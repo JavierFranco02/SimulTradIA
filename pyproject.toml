@@ -7,12 +7,15 @@ name = "simultradia"
 version = "0.1.0"
 description = "Simulador de trading e inversión con IA (aplicación de escritorio)"
 requires-python = ">=3.8"
-# Librerías de la app. Las previstas (yfinance, pandas, lightgbm...) se suman aquí cuando se usen.
+# Librerías de la app. Las previstas (pandas, lightgbm...) se suman aquí cuando se usen.
 dependencies = [
     "ttkbootstrap>=1.10",
     "psycopg2-binary>=2.9",
     "argon2-cffi>=21.3",
     "python-dotenv>=1.0",
+    "ccxt>=4.0",
+    "yfinance>=0.2.40",
+    "matplotlib>=3.5",
 ]
 
 [tool.setuptools.packages.find]

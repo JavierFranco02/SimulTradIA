@@ -1,4 +1,4 @@
-"""Casos de uso de usuarios: autenticar (verificar el login) y registrarse.
+"""Casos de uso de usuarios: autenticar (verificar el login), registrarse y cambiar la contraseña temporal.
 
 Aquí viven las REGLAS y las VALIDACIONES. Este archivo NO conoce tkinter ni SQL:
 usa los repositorios para hablar con la base de datos y lanza errores propios que
@@ -37,7 +37,8 @@ class UsuarioService:
         """Verifica el email y la contraseña y devuelve el usuario.
 
         NO inicia ninguna sesión: eso lo decide quien llama (el controlador), cuando el
-        resultado llega a una pantalla que sigue vigente.
+        resultado llega a una pantalla que sigue vigente. Si el usuario tiene una contraseña
+        temporal (`debe_cambiar_password`), el controlador lo manda a cambiarla en vez de entrar.
         """
         email = self._normalizar_email(email)
 
@@ -71,6 +72,40 @@ class UsuarioService:
     def crear_administrador(self, nombre: str, email: str, password: str, confirmacion: str) -> Usuario:
         """Solo se usa desde scripts/crear_admin.py, nunca desde la pantalla de registro."""
         return self._crear(nombre, email, password, confirmacion, RolUsuario.ADMIN)
+
+    # ------------------------------------------------- contraseña temporal
+    def cambiar_password_temporal(self, email: str, password_actual: str, password_nueva: str,
+                                  confirmacion: str) -> Usuario:
+        """Cambia la contraseña temporal que entregó el administrador por una elegida por el usuario.
+
+        Pide la temporal otra vez (no hay sesión abierta todavía) y solo funciona si la cuenta
+        tiene un cambio pendiente. NO inicia sesión: la persona vuelve al login con la nueva.
+        """
+        email = self._normalizar_email(email)
+        errores = {
+            "actual": None if password_actual else "Ingresa tu contraseña temporal.",
+            "password": self._error_password(password_nueva),
+        }
+        if not errores["password"]:
+            errores["confirmacion"] = self._error_confirmacion(password_nueva, confirmacion)
+            if password_nueva == password_actual:
+                errores["password"] = "La contraseña nueva debe ser distinta de la temporal."
+        self._lanzar_si_hay_errores(errores)
+
+        with self._db.obtener_conexion() as conn:
+            usuario = self._usuarios.buscar_por_email(conn, email)
+            if usuario is None:
+                gastar_tiempo_de_verificacion(password_actual)
+                raise CredencialesInvalidas()
+            if not verificar_password(password_actual, usuario.password_hash):
+                raise CredencialesInvalidas()
+            if not usuario.activo:
+                raise CuentaDesactivada()
+            if not usuario.debe_cambiar_password:
+                raise CredencialesInvalidas("Esta cuenta no tiene un cambio de contraseña pendiente.")
+            self._usuarios.actualizar_password(conn, usuario.id_usuario, hashear_password(password_nueva), False)
+        usuario.debe_cambiar_password = False
+        return usuario
 
     # --------------------------------------------------------------- interno
     def _crear(self, nombre: str, email: str, password: str, confirmacion: str,

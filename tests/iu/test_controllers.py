@@ -12,6 +12,8 @@ from simultradia.core.exceptions import (
     EmailYaRegistrado,
 )
 from simultradia.core.session import Session
+from simultradia.domain.entities.usuario_entity import Usuario
+from simultradia.iu.auth.cambiar_password_controller import CambiarPasswordController
 from simultradia.iu.auth.login_controller import LoginController
 from simultradia.iu.auth.registro_controller import RegistroController
 from simultradia.iu.shell.shell_controller import ShellController
@@ -25,6 +27,10 @@ from tests.fakes import (
 
 # Los dos formularios comparten FormController: ahí está ejecutar_en_hilo.
 _EJECUTAR_EN_HILO = "simultradia.iu.base.form_controller.ejecutar_en_hilo"
+
+
+def _usuario(temporal=False):
+    return Usuario(nombre="Ana", email="ana@x.com", password_hash="h", debe_cambiar_password=temporal)
 
 
 class PruebasControladores(unittest.TestCase):
@@ -44,16 +50,23 @@ class PruebasControladores(unittest.TestCase):
         self.assertEqual(self.nav.llamadas, [("registro", {})])
 
     def test_login_correcto_abre_la_sesion_y_navega_al_home(self):
-        vista, servicio = VistaFalsa(), ServicioFalso(resultado="USUARIO")
+        usuario = _usuario()
+        vista, servicio = VistaFalsa(), ServicioFalso(resultado=usuario)
         LoginController(vista, servicio, self.nav, self.session).iniciar_sesion()
         self.assertEqual(servicio.llamadas, [("autenticar", "ana@x.com", "Clave12345")])
         self.assertEqual(self.nav.llamadas, [("home", {})])
         self.assertTrue(vista.ocupado)   # el botón queda ocupado hasta que cambia la pantalla
-        self.assertEqual(self.session.usuario, "USUARIO")   # el controlador abrió la sesión
+        self.assertIs(self.session.usuario, usuario)   # el controlador abrió la sesión
+
+    def test_login_con_contrasena_temporal_va_a_cambiarla_y_no_abre_la_sesion(self):
+        vista, servicio = VistaFalsa(), ServicioFalso(resultado=_usuario(temporal=True))
+        LoginController(vista, servicio, self.nav, self.session).iniciar_sesion()
+        self.assertEqual(self.nav.llamadas, [("cambiar_password", {"email": "ana@x.com"})])
+        self.assertFalse(self.session.esta_iniciada)
 
     def test_limpia_los_errores_anteriores_al_enviar(self):
         vista = VistaFalsa()
-        LoginController(vista, ServicioFalso(resultado="U"), self.nav, self.session).iniciar_sesion()
+        LoginController(vista, ServicioFalso(resultado=_usuario()), self.nav, self.session).iniciar_sesion()
         self.assertEqual(vista.errores_limpiados, 1)
 
     def test_errores_de_campo_van_cada_uno_a_su_campo(self):
@@ -89,7 +102,7 @@ class PruebasControladores(unittest.TestCase):
         self.assertEqual(vista.campos_limpiados, [])
 
     def test_ignora_pulsaciones_mientras_esta_ocupado(self):
-        vista, servicio = VistaFalsa(), ServicioFalso(resultado="U")
+        vista, servicio = VistaFalsa(), ServicioFalso(resultado=_usuario())
         vista.ocupado = True
         LoginController(vista, servicio, self.nav, self.session).iniciar_sesion()
         self.assertEqual(servicio.llamadas, [])
@@ -122,9 +135,43 @@ class PruebasControladores(unittest.TestCase):
         vista.acciones["al_volver_a_login"]()
         self.assertEqual(self.nav.llamadas, [("login", {})])
 
+    # ------------------------------------------- cambio de contraseña temporal
+    def test_al_cambiarla_vuelve_al_login_con_un_aviso(self):
+        vista = VistaFalsa()
+        CambiarPasswordController(vista, _ServicioCambio(_usuario()), self.nav, "ana@x.com").guardar()
+        nombre, parametros = self.nav.llamadas[0]
+        self.assertEqual((nombre, parametros["email"]), ("login", "ana@x.com"))
+        self.assertIn("Contraseña actualizada", parametros["mensaje"])
+        self.assertFalse(self.session.esta_iniciada)
+
+    def test_el_servicio_recibe_el_email_de_la_cuenta_y_lo_escrito(self):
+        vista, servicio = VistaFalsa(actual="Temporal1", password="Nueva-Clave-9", confirmacion="Nueva-Clave-9"), _ServicioCambio(_usuario())
+        CambiarPasswordController(vista, servicio, self.nav, "ana@x.com").guardar()
+        self.assertEqual(servicio.llamadas, [("ana@x.com", "Temporal1", "Nueva-Clave-9", "Nueva-Clave-9")])
+
+    def test_temporal_equivocada_es_error_general_y_borra_ese_campo(self):
+        vista = VistaFalsa()
+        CambiarPasswordController(vista, _ServicioCambio(error=CredencialesInvalidas()), self.nav, "ana@x.com").guardar()
+        self.assertEqual(vista.error_general, "Email o contraseña incorrectos.")
+        self.assertEqual(vista.campos_limpiados, ["actual"])
+        self.assertEqual(self.nav.llamadas, [])
+
+    def test_errores_de_campo_del_cambio_van_cada_uno_a_su_campo(self):
+        vista = VistaFalsa()
+        error = DatosInvalidos({"password": "La contraseña debe tener al menos 8 caracteres."})
+        CambiarPasswordController(vista, _ServicioCambio(error=error), self.nav, "ana@x.com").guardar()
+        self.assertEqual(vista.errores_campos, error.errores)
+        self.assertFalse(vista.ocupado)
+
+    def test_se_puede_volver_al_login_sin_cambiarla(self):
+        vista = VistaFalsa()
+        CambiarPasswordController(vista, ServicioFalso(), self.nav, "ana@x.com")
+        vista.acciones["al_volver_a_login"]()
+        self.assertEqual(self.nav.llamadas, [("login", {})])
+
     # ------------------------------- el usuario se va mientras la operación sigue
     def test_login_que_termina_despues_de_salir_no_navega_ni_abre_la_sesion(self):
-        vista, servicio, ejecutor = VistaFalsa(), ServicioFalso(resultado="USUARIO"), EjecutorDiferido()
+        vista, servicio, ejecutor = VistaFalsa(), ServicioFalso(resultado=_usuario()), EjecutorDiferido()
         with mock.patch(_EJECUTAR_EN_HILO, ejecutor):
             LoginController(vista, servicio, self.nav, self.session).iniciar_sesion()
             vista.viva = False            # el usuario pasa a otra pantalla mientras espera
@@ -133,7 +180,7 @@ class PruebasControladores(unittest.TestCase):
         self.assertFalse(self.session.esta_iniciada)   # nunca se abrió: no hay nada que deshacer
 
     def test_login_que_termina_con_la_pantalla_viva_abre_la_sesion_y_navega(self):
-        vista, servicio, ejecutor = VistaFalsa(), ServicioFalso(resultado="USUARIO"), EjecutorDiferido()
+        vista, servicio, ejecutor = VistaFalsa(), ServicioFalso(resultado=_usuario()), EjecutorDiferido()
         with mock.patch(_EJECUTAR_EN_HILO, ejecutor):
             LoginController(vista, servicio, self.nav, self.session).iniciar_sesion()
             ejecutor.terminar_todo()
@@ -163,6 +210,19 @@ class PruebasControladores(unittest.TestCase):
         vista.acciones["al_cerrar_sesion"]()
         self.assertFalse(self.session.esta_iniciada)
         self.assertEqual(self.nav.llamadas, [("login", {})])
+
+
+class _ServicioCambio:
+    """Servicio falso para el cambio de contraseña temporal: anota lo que recibe."""
+
+    def __init__(self, resultado=None, error=None):
+        self.resultado, self.error, self.llamadas = resultado, error, []
+
+    def cambiar_password_temporal(self, email, actual, nueva, confirmacion):
+        self.llamadas.append((email, actual, nueva, confirmacion))
+        if self.error:
+            raise self.error
+        return self.resultado
 
 
 if __name__ == "__main__":

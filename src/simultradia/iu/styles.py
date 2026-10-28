@@ -7,6 +7,7 @@ la app se edita un solo lugar: este archivo.
   - Cambiar la fuente de toda la app       ->  Fonts.FAMILY
   - Cambiar el tamaño o peso de un rol     ->  Fonts._ROLES
   - Cambiar un color o un espaciado        ->  Colors / Spacing
+  - Cambiar los colores del gráfico/tabla  ->  Palette
 """
 import tkinter.font as tkfont
 
@@ -19,6 +20,24 @@ class Colors:
     MUTED = "secondary"
     SUCCESS = "success"
     DANGER = "danger"
+    WARNING = "warning"
+
+
+class Palette:
+    """Colores y tamaños para lo que NO es un widget de ttkbootstrap: el gráfico (matplotlib)
+    y las etiquetas de la tabla. Van acordes al tema oscuro `darkly`."""
+    ALZA = "#00bc8c"                 # verde: sube
+    BAJA = "#e74c3c"                 # rojo: baja
+    FONDO = "#222222"
+    GRILLA = "#444444"
+    TEXTO = "#adb5bd"
+    SMA = "#f39c12"
+    EMA = "#3498db"
+    BOLLINGER = "#9b59b6"
+    RSI = "#f1c40f"
+    MACD = "#3498db"
+    SENAL = "#f39c12"
+    TAMANO_TEXTO = 8                 # tamaño de letra dentro del gráfico
 
 
 class ButtonStyle:
@@ -26,6 +45,9 @@ class ButtonStyle:
     PRIMARY = "primary"
     LINK = "link"                    # parece un enlace de texto
     DANGER_OUTLINE = "danger-outline"
+    SUCCESS_OUTLINE = "success-outline"
+    TOGGLE = "outline-toolbutton"    # botón que queda "hundido" al elegirlo (pestañas, filtros)
+    SWITCH = "round-toggle"          # interruptor deslizante (encendido/apagado)
 
 
 class Spacing:
@@ -44,6 +66,7 @@ class Fonts:
     """
     FAMILY = "Helvetica"             # cambiar esta línea cambia la fuente de TODA la app
 
+    DISPLAY = "simultradia.display"  # cifras grandes (el precio del gráfico)
     TITLE = "simultradia.title"
     HEADING = "simultradia.heading"
     SUBTITLE = "simultradia.subtitle"
@@ -52,6 +75,7 @@ class Fonts:
 
     # (tamaño, peso) de cada rol
     _ROLES = {
+        DISPLAY: (24, "bold"),
         TITLE: (22, "bold"),
         HEADING: (18, "bold"),
         SUBTITLE: (11, "normal"),
@@ -82,5 +106,5 @@ class Fonts:
 
         # Los botones y casillas no aceptan "font=" directamente: la toman del estilo.
         estilo = ttk.Style()
-        for widget in ("TButton", "TCheckbutton"):
+        for widget in ("TButton", "TCheckbutton", "TRadiobutton"):
             estilo.configure(widget, font=cls.BODY)
