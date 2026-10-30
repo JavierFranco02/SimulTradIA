@@ -3,6 +3,9 @@
 Reúne lo que todas comparten: el título centrado, el registro de campos, el botón
 principal, el mensaje general y los errores por campo. Cada pantalla hija solo
 dice QUÉ campos y botones tiene.
+
+El formulario va dentro de una "tarjeta" con borde y con un fondo distinto al de la
+ventana, para que no parezca que ocupa toda la pantalla cuando esta se agranda.
 """
 from typing import Dict, Optional
 
@@ -14,13 +17,15 @@ from simultradia.iu.styles import Colors, Fonts, Spacing
 
 class FormView(ttk.Frame):
     def __init__(self, parent, titulo: str, subtitulo: str = ""):
-        super().__init__(parent, padding=Spacing.LG)
+        super().__init__(parent, padding=Spacing.LG, bootstyle=Colors.SURFACE)
         self._campos: Dict[str, FormField] = {}
         self._mensaje: Optional[StatusMessage] = None
         self._boton_principal: Optional[ActionButton] = None
 
-        tarjeta = ttk.Frame(self)
-        tarjeta.pack(expand=True)   # sin fill => el formulario queda centrado en la ventana
+        borde = ttk.Frame(self, padding=1, bootstyle=Colors.MUTED)   # línea de 1 px alrededor
+        borde.pack(expand=True)     # sin fill => la tarjeta queda centrada y no se estira
+        tarjeta = ttk.Frame(borde, padding=Spacing.LG)
+        tarjeta.pack()
         ttk.Label(tarjeta, text=titulo, font=Fonts.TITLE, bootstyle=Colors.PRIMARY).pack()
         if subtitulo:
             ttk.Label(tarjeta, text=subtitulo, font=Fonts.SUBTITLE,

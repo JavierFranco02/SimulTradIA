@@ -50,7 +50,7 @@ class ActivosAdminController(PanelController):
             al_fallar=self._al_fallar_agregar)
 
     def probar_fuente(self, ticker: str, tipo: str, id_fuente: int) -> None:
-        """Comprueba que la fuente elegida en "Pasar el activo a" reconoce el ticker del activo elegido."""
+        """Comprueba que la fuente elegida en "Pasar a" reconoce el ticker del activo elegido."""
         actor = self._session.usuario
         self._vista.limpiar_mensaje()
         self._ejecutar(
@@ -90,7 +90,7 @@ class ActivosAdminController(PanelController):
 
     def _al_agregar(self, activo) -> None:
         self._vista.establecer_ocupado(False)
-        self._vista.limpiar_formulario()
+        self._vista.limpiar_formulario()      # cierra la ventana de agregar
         self._vista.mostrar_exito("%s agregado. Sus velas se descargan en la próxima pasada del worker."
                                   % activo.ticker)
         self.cargar()
@@ -100,6 +100,7 @@ class ActivosAdminController(PanelController):
         self._vista.mostrar_exito("✓ %s reconoce %s." % (fuente, ticker.strip().upper()))
 
     def _al_editar(self, _resultado) -> None:
+        self._vista.cerrar_edicion()
         self._vista.mostrar_exito("Cambios guardados.")
         self.cargar()
 
