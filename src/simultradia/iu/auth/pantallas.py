@@ -6,8 +6,8 @@ from simultradia.iu.auth.login_view import LoginView
 from simultradia.iu.auth.registro_controller import RegistroController
 from simultradia.iu.auth.registro_view import RegistroView
 
-_TAMANO = (480, 660)
-_MINIMO = (420, 600)
+_TAMANO = (480, 720)
+_MINIMO = (420, 660)
 
 
 def _login(padre, nav, email: str = "", mensaje: str = ""):

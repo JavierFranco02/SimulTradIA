@@ -351,6 +351,7 @@ class VistaPanelFalsa:
     def mostrar_contrasena_temporal(self, id_usuario, password): self.eventos.append(("temporal", (id_usuario, password)))
     def mostrar_errores_edicion(self, errores): self.eventos.append(("errores_edicion", dict(errores)))
     def limpiar_errores_edicion(self): self.eventos.append(("limpiar_errores_edicion", ()))
+    def cerrar_edicion(self): self.eventos.append(("cerrar_edicion", ()))
     def mostrar_activos(self, items): self.eventos.append(("activos", items))
     def mostrar_estado(self, estado, fuentes=None): self.eventos.append(("estado", (estado, fuentes)))
 
