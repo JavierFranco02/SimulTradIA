@@ -21,7 +21,7 @@ class MercadoView(PanelView):
     def __init__(self, parent):
         super().__init__(parent, padding=Spacing.MD)
         cabecera = ttk.Frame(self)
-        cabecera.pack(fill="x", pady=(0, Spacing.SM), before=self._mensaje)
+        cabecera.pack(fill="x", pady=(0, Spacing.SM))
         ttk.Label(cabecera, text="Mercado", font=Fonts.HEADING).pack(side="left")
         self._boton_lista = ActionButton(cabecera, "◀ Ocultar lista", self._alternar_lista,
                                          estilo=ButtonStyle.LINK)

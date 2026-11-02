@@ -3,7 +3,7 @@
 Vista pasiva: dibuja y expone métodos; ListaController decide qué pedir y cuándo.
 """
 import tkinter as tk
-from typing import Callable, Dict, Optional
+from typing import Callable, Optional
 
 import ttkbootstrap as ttk
 
@@ -92,12 +92,14 @@ class ListaActivosView(PanelView):
         self._tabla.establecer_filas(filas)
         self._tabla.marcar_orden(orden, descendente)
 
+        # Es un estado que se repite en cada refresco (cada 3 s): va en el pie, no en un diálogo.
         if panel.actualizado_en is None:
-            self.mostrar_error("Aún no hay precios guardados. Abre otra terminal y ejecuta: python worker.py")
-            self._pie.configure(text="")
+            self._pie.configure(text="Sin precios todavía: ejecuta python worker.py",
+                                bootstyle=Colors.DANGER)
         else:
-            self.limpiar_mensaje()
-            self._pie.configure(text="%d activos · actualizado %s" % (len(panel.items), hace(panel.actualizado_en)))
+            self._pie.configure(
+                text="%d activos · actualizado %s" % (len(panel.items), hace(panel.actualizado_en)),
+                bootstyle=Colors.MUTED)
 
     def seleccionar(self, id_activo: int) -> None:
         self._tabla.seleccionar(str(id_activo))

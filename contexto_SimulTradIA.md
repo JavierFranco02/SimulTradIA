@@ -34,7 +34,7 @@ historial de aciertos, sentimiento de noticias, escáner de oportunidades) · **
 fecha pasada mientras las velas avanzan) · **coach de IA** (analiza las operaciones cerradas y detecta patrones).
 
 **Administrador:** usuarios (listar, desactivar/reactivar, reiniciar cuenta, rol) · activos (agregar por ticker,
-editar, desactivar, **elegir, probar y cambiar su fuente de datos**) · ingesta de datos (estado, fuentes, probar conexión,
+editar el nombre, desactivar, **elegir, probar y cambiar su fuente de datos**) · ingesta de datos (estado, fuentes, probar conexión,
 ejecución manual de todo o de una fuente) · **contraseña temporal** para quien olvidó la suya ·
 modelos de IA (métricas, precisión real, reentrenar, activar o revertir versión) · glosario · panel de resumen ·
 auditoría. El admin nunca ve contraseñas ni opera dentro de la cuenta de un usuario; sus permisos se validan en los
@@ -44,6 +44,8 @@ registro público.
 **Opcional si sobra tiempo:** alertas, varias cuentas simuladas, predicción de volatilidad.
 **Descartado:** social, tutoriales y retos, chat asistente, datos fundamentales, calendario, posiciones cortas,
 guardar configuraciones de gráfico, exportar PDF/CSV.
+**Previsto más adelante:** una **moneda de la aplicación** configurable, con cambio de moneda según tasa de cambio
+(hoy cada activo guarda su moneda al crearse y no se edita; ver decisión 34).
 
 ### Enfoque de la IA
 - Predicción de **dirección con probabilidades** (`prob_alcista + prob_bajista + prob_lateral = 1`) y confianza.
@@ -68,6 +70,8 @@ guardar configuraciones de gráfico, exportar PDF/CSV.
    repo, archivos completos). **No des código para copiar y pegar** ni fragmentos por archivo: esa mecánica ya no se
    usa. Junto al zip, di solo qué archivos se **agregaron**, cuáles se **modificaron** y cuáles hay que **borrar a
    mano** (un zip no puede borrar), más lo que no pudiste verificar. Mantén tu copia interna del proyecto actualizada.
+   **Incluye `contexto_SimulTradIA.md` en el zip cuando el cambio toque arquitectura, decisiones o estado** (el texto
+   completo está en el contexto del proyecto: no hace falta que el usuario lo pida).
 4. **Lee el archivo actual antes de modificarlo o sobrescribirlo.** Puede haber cambiado desde la última vez
    que lo viste. Si no tienes el código a mano, pídelo antes de escribir cambios.
 5. **Respeta la arquitectura y su estructura de carpetas** (secciones 4 y 5). Si algo no encaja, propón
@@ -75,7 +79,8 @@ guardar configuraciones de gráfico, exportar PDF/CSV.
 6. **No compliques.** Nada de archivos o abstracciones sin uso real, ni ajustes, reglas o estilos para
    valores que se usan en un solo lugar. **Interfaz:** el usuario no quiere tarjetas de resumen donde la
    información se pueda mostrar de otra forma (texto, filas, tablas), y prefiere interruptores visibles (no botones)
-   para activar o desactivar opciones.
+   para activar o desactivar opciones. **Los avisos de éxito o error de una sección se muestran en un diálogo**, no
+   como texto que se quede escrito en la pantalla (decisión 35).
 7. **El esquema SQL es una guía, no la base real.** Antes de escribir SQL o entidades que toquen una tabla,
    confirma con el usuario qué columnas tiene realmente; no asumas lo que dice `schema.sql`. Las tablas de Mercado
    sí están definidas en `database/mercado.sql`.
@@ -122,7 +127,7 @@ Vista ──callbacks (vincular_acciones)──► Controlador ──► Servici
 
 | Capa | Hace | No hace |
 |---|---|---|
-| **Vista** (`iu/<módulo>/*_view.py`) | Dibuja widgets; expone métodos para leer y mostrar datos. Pasiva. | Lógica, SQL, llamar a servicios. |
+| **Vista** (`iu/<módulo>/*_view.py`) | Dibuja widgets; expone métodos para leer y mostrar datos (y abrir los diálogos de aviso). Pasiva. | Lógica, SQL, llamar a servicios. |
 | **Controlador** (`iu/<módulo>/*_controller.py`) | Intermediario: lee la vista, lanza el trabajo en segundo plano, decide qué hacer con el resultado (navegar con `navegador.ir_a`, mostrar error, abrir/cerrar sesión, refrescar cada pocos segundos). | Importar vistas (recibe la vista ya creada). |
 | **Servicio** (`services`) | Reglas de negocio y **validaciones**. Abre la transacción y llama a **repositorios** y **clientes** (combina repositorios, no llama transacciones de otros servicios). Los métodos de administración reciben el `actor` y llaman a `exigir_admin`. | Conocer tkinter o escribir SQL. Llamar a una API externa con una conexión de BD abierta. |
 | **Repositorio** (`repositories`) | **Único lugar con SQL.** Convierte filas en entidades leyendo por **nombre de columna**. | Reglas de negocio. Concatenar SQL con datos: siempre parámetros `%s`. |
@@ -168,14 +173,15 @@ src/simultradia/
     navegacion.py    Navegador: ir_a("nombre", **parametros)
     rutas.py         registra las pantallas de todos los módulos
     components/      clases reutilizables: ActionButton, FormField, PasswordField, ShowPasswordToggle,
-                     StatusMessage, DataTable, SelectField, CandleChart (+ candle_render.py: dibuja con matplotlib, sin tkinter)
-    base/            FormView/FormController (formularios, dibujados dentro de una tarjeta con borde) y PanelView/PanelController (secciones)
+                     StatusMessage (solo errores de formulario), DataTable, SelectField, CandleChart
+                     (+ candle_render.py: dibuja con matplotlib, sin tkinter)
+    base/            FormView/FormController (formularios, dibujados dentro de una tarjeta con borde) y PanelView/PanelController (secciones; avisos en diálogos)
     auth/            login, registro y cambio de contraseña temporal (vistas, controladores, pantallas.py)
     shell/           ventana "home": menú lateral + área de contenido (ShellView, ShellController)
     inicio/          sección de bienvenida (PROVISIONAL: se rehace al final)
     mercado/         mercado_view (panel dividido), lista_view/lista_controller, grafico_view/grafico_controller
     admin/           usuarios, activos, ingesta: cada uno con su vista y su controlador;
-                     activo_dialogs.py = ventanas emergentes de Activos (agregar y editar)
+                     activo_dialogs.py = ventanas emergentes de Activos (agregar y editar el nombre)
     <módulo>/        trading/, backtesting/, ia/... cuando lleguen
 ```
 **(previsto)** = la carpeta existe solo con su `__init__.py` y un docstring; se llena cuando llegue su módulo.
@@ -210,8 +216,18 @@ El paquete se llama **`simultradia`** (no `main`: chocaría con `main.py`).
   `DatosInvalidos` (lleva `{campo: mensaje}` y el controlador lo reparte **bajo cada campo**), `ErrorPermisos`,
   `ErrorOperacionInvalida` (una acción que no se puede hacer), `ErrorServicioExterno` (falló una API de afuera),
   `ErrorBaseDatos`, `CredencialesInvalidas`, `CuentaDesactivada`. Los errores que no son de un campo van al
-  **mensaje general**. Cualquier otra excepción es inesperada: se registra en el log y el usuario ve un mensaje
+  **mensaje general**: en un formulario (login, registro...) es el texto de error del formulario; en una sección del
+  panel es un **diálogo**. Cualquier otra excepción es inesperada: se registra en el log y el usuario ve un mensaje
   genérico. Las claves de campo (`"nombre"`, `"email"`, `"password"`, `"ticker"`...) son compartidas entre servicio y vista.
+- **Avisos al usuario (diálogos):** en las secciones del panel (`PanelView`) `mostrar_error` y `mostrar_exito` abren un
+  diálogo (`messagebox`) sobre la pantalla; nada de texto fijo que se quede ahí. Las vistas con ventanas emergentes
+  (Activos) sobreescriben `_padre_aviso()` para abrir el diálogo sobre la ventana emergente si hay una abierta. Un estado
+  que se repite en cada refresco (p. ej. "Sin precios todavía" en la lista de Mercado) NO es un aviso: va como texto en la
+  propia pantalla (el pie de la lista). En los **refrescos periódicos** (lista y gráfico de Mercado, estado de Ingesta)
+  un fallo que se mantiene se avisa UNA sola vez: `PanelController._avisar_una_vez(clave, error)` y
+  `_recuperado(clave)`; si no, saldría un diálogo cada pocos segundos. La confirmación "¡Cuenta creada!" del login
+  también es un diálogo. Los formularios siguen mostrando el error de cada campo bajo su campo y el error general en
+  el propio formulario (`StatusMessage`, que solo muestra errores).
 - **Permisos:** los métodos de administración reciben `actor: Usuario` (el controlador pasa `session.usuario`) y
   llaman a `exigir_admin(actor)` (`services/permisos.py`), que lanza `ErrorPermisos`.
 - **Transacciones:** `with db.obtener_conexion() as conn:` presta una conexión; commit al salir bien, rollback
@@ -229,7 +245,9 @@ El paquete se llama **`simultradia`** (no `main`: chocaría con `main.py`).
 - **Ventanas emergentes (Activos):** agregar y editar un activo se hacen en ventanas modales (`iu/admin/activo_dialogs.py`:
   `AgregarActivoDialog`, `EditarActivoDialog`) para no recargar la zona sobre la tabla. Son vistas pasivas que abre
   `ActivosAdminView`; la vista conserva la misma interfaz hacia el controlador y reenvía a la ventana abierta los errores
-  por campo, los mensajes y el estado «ocupado». Al agregar con éxito la ventana se cierra; doble clic en una fila abre la edición.
+  por campo y el estado «ocupado». Los errores que no son de un campo y las confirmaciones salen en un diálogo sobre la
+  ventana. Al agregar con éxito la ventana se cierra; doble clic en una fila abre la edición. **Editar solo cambia el
+  nombre**: la moneda de un activo no se edita (decisión 34).
 - **Probar y actualizar por fuente:** `IngestaService.probar_fuente` le pide a la fuente el precio de su activo de
   ejemplo (`EJEMPLO_TICKER` del cliente) y mide cuánto tarda, sin guardar nada; un fallo se devuelve como resultado, no
   como error. `ejecutar_manual(actor, id_fuente)` actualiza solo una fuente (debe estar habilitada).
@@ -268,10 +286,11 @@ El paquete se llama **`simultradia`** (no `main`: chocaría con `main.py`).
 4. En el `pantallas.py` del módulo, una fábrica y su `registrar` (`navegador.registrar("nombre", fabrica, ...)`).
 
 **Sección del panel** (mercado, portafolio, administración...): carpeta `iu/<módulo>/` con vista (hereda de
-`PanelView`: título, mensaje general, `esta_viva()` y `programar(ms, accion)` para refrescos que se cancelan solos),
-controlador (hereda de `PanelController`: `_ejecutar` descarta resultados de pantallas cerradas y muestra errores) y
-`pantallas.py` registrando con `en_shell=True`; sumar el módulo en `iu/rutas.py` y su botón en `_MENU` de
-`iu/shell/pantallas.py`. Los refrescos periódicos se encadenan con `vista.programar` y comprueban `esta_viva()`.
+`PanelView`: título, avisos en diálogos con `mostrar_error`/`mostrar_exito`, `esta_viva()` y `programar(ms, accion)`
+para refrescos que se cancelan solos), controlador (hereda de `PanelController`: `_ejecutar` descarta resultados de
+pantallas cerradas y muestra errores; `_avisar_una_vez` para consultas periódicas) y `pantallas.py` registrando con
+`en_shell=True`; sumar el módulo en `iu/rutas.py` y su botón en `_MENU` de `iu/shell/pantallas.py`. Los refrescos
+periódicos se encadenan con `vista.programar` y comprueban `esta_viva()`.
 
 ---
 
@@ -352,6 +371,14 @@ lo que hace: `autenticar` verifica y no inicia sesión; el controlador es quien 
 32. **Agregar y editar un activo (admin) son ventanas emergentes,** no formularios sobre la tabla (`iu/admin/activo_dialogs.py`):
     menos cosas encima de la tabla. Doble clic en una fila abre la edición.
 33. **Entrega de cambios: siempre un `.zip` con los archivos nuevos y modificados, sin código para copiar y pegar** (sección 2, punto 3).
+34. **La moneda de un activo NO se edita** (no hay función de conversión y no tiene sentido cambiarla activo por activo): se
+    asigna al agregarlo (USD; en divisas de Yahoo, la segunda moneda del par) y `ActivoAdminService.editar(actor, id, nombre)`
+    solo cambia el nombre. Más adelante se añadirá una **moneda de la aplicación** configurable, con cambio de moneda según
+    tasa de cambio.
+35. **Los avisos de éxito o error de las secciones del panel son diálogos,** no un texto fijo en la pantalla (un "guardado" o un
+    error no debe quedarse escrito cuando ya no importa). Los estados que se repiten en cada refresco van como texto en la
+    pantalla; los fallos de los refrescos periódicos se avisan una sola vez (`_avisar_una_vez`). Los formularios conservan el
+    error bajo cada campo y el error general en el propio formulario. Ver sección 4.3 ("Avisos al usuario").
 
 ---
 
@@ -393,7 +420,7 @@ PostgreSQL 9.3, claves `id_<entidad>` y los tipos de abajo.
 - Desde la raíz: `python -m unittest discover -s tests -t . -v` (con `pip install -e .` hecho). No necesitan PostgreSQL, ventanas ni internet.
 - Estructura: `tests/fakes.py` (falsos compartidos) y subcarpetas `core/`, `services/`, `iu/`, `analisis/`, `clients/`, cada una con `__init__.py`; se importa `from tests.fakes import ...`.
 - **Servicios:** `DatabaseFalsa`, `RepositorioFalso`, `CuentaRepositorioFalso`, `RepoActivoFalso`, `RepoPrecioFalso`, `RepoFuenteFalso`, `UsuarioRepoAdminFalso`, `ClienteMercadoFalso` (hace de una fuente y declara sus tipos, formato de ticker y ritmo).
-- **Controladores:** `VistaFalsa` (formularios), `VistaPanelFalsa` (secciones; anota lo que le ordenan), `NavegadorFalso`, `ServicioFalso`, `ServicioGenerico` (responde cualquier método con lo que se le prepare) y una `Session()` propia por prueba. `ejecutar_en_hilo` se reemplaza con `mock.patch(...)` en `simultradia.iu.base.form_controller` o `simultradia.iu.base.panel_controller` (en el acto, o diferido con `EjecutorDiferido`).
+- **Controladores:** `VistaFalsa` (formularios), `VistaPanelFalsa` (secciones; anota lo que le ordenan, y cada diálogo de error que se habría abierto en `errores_mostrados`), `NavegadorFalso`, `ServicioFalso`, `ServicioGenerico` (responde cualquier método con lo que se le prepare) y una `Session()` propia por prueba. `ejecutar_en_hilo` se reemplaza con `mock.patch(...)` en `simultradia.iu.base.form_controller` o `simultradia.iu.base.panel_controller` (en el acto, o diferido con `EjecutorDiferido`). `tests/iu/test_panel_controller.py` prueba el aviso único de los refrescos periódicos.
 - **Navegador:** `VentanaFalsa`, `PantallaFalsa`, `ShellFalso`.
 - **Análisis, formato y gráfico:** puro Python; el dibujo (`candle_render`) se prueba con una `Figure` de matplotlib y `savefig`. Las pruebas del cliente de Yahoo usan tablas de pandas armadas a mano (se saltan si pandas no está).
 - **Entorno de Claude:** sin tkinter, ttkbootstrap, psycopg2, ccxt, yfinance ni red. Se verifica con módulos simulados (stubs) en una carpeta temporal y `PYTHONPATH`. Lo visual y las conexiones reales solo los puede comprobar el usuario.
@@ -409,7 +436,9 @@ filas leídas por posición · `sys.path.insert` · sobrescribir un archivo sin 
 afirmar que algo funciona visualmente sin haberlo visto · tarjetas de resumen donde una línea o una tabla bastan ·
 llamar a una API externa con una conexión de base de datos abierta · mezclar velas de dos fuentes en un mismo activo ·
 dibujar velas planas con el mercado cerrado · una consulta SQL distinta por cada combinación de filtros cuando hay
-pocas filas · un servicio por rol en lugar de por tema · **entregar código para copiar y pegar en lugar del `.zip`**.
+pocas filas · un servicio por rol en lugar de por tema · **mensajes de éxito o error de una sección como texto fijo en la
+pantalla (van en diálogo)** · **un diálogo de error en cada vuelta de un refresco periódico** · **editar la moneda de un
+activo suelto** · **entregar código para copiar y pegar en lugar del `.zip`**.
 
 ---
 
@@ -422,8 +451,9 @@ pocas filas · un servicio por rol en lugar de por tema · **entregar código pa
   RSI y MACD.
 - **Datos:** worker con ingesta por fuente (Binance y Yahoo Finance), cada una a su ritmo.
 - **Administración:** Usuarios (buscar y filtrar, activar/desactivar, restablecer contraseña con una temporal), Activos
-  (buscar y filtrar, agregar y editar en ventanas emergentes, probar ticker, habilitar, probar y cambiar fuente) e
+  (buscar y filtrar, agregar y editar el nombre en ventanas emergentes, probar ticker, habilitar, probar y cambiar fuente) e
   Ingesta de datos (estado, habilitar fuentes, probar conexión, actualizar una fuente o todo).
+- **Avisos:** errores y confirmaciones de las secciones en diálogos (decisión 35); la moneda por activo ya no se edita (decisión 34).
 
 **Pendiente de administración (próxima mejora)**
 - Usuarios: **cambiar el rol** (decidido a medias: ver más abajo), reiniciar la cuenta (necesita las tablas de operar) y
@@ -441,9 +471,10 @@ pocas filas · un servicio por rol en lugar de por tema · **entregar código pa
 
 **Pendiente del usuario (orden propuesto)**
 Operar y Portafolio (van juntos) → Watchlist → noticias → IA → Backtesting → Replay → Coach → Glosario → **Inicio** (al final).
+Más adelante: **moneda de la aplicación** (configuración + cambio de moneda con tasa de cambio).
 
 **Deuda técnica conocida**
 - Renombrar `UsuarioService` a `AuthService` y usar `validacion.py` en lugar de su copia de `_lanzar_si_hay_errores` (aplazado al final del proyecto).
 - `yfinance` no se ha probado contra internet real; Yahoo cambia y bloquea con cierta frecuencia. Si falla, el worker lo registra y sigue con Binance.
 - Binance puede estar bloqueado en algunos países; si no hay datos, revisar el log del worker.
-- Lo visual de la interfaz nunca lo ha visto Claude: lo valida el usuario ejecutando la app (incluidas la tarjeta de los formularios y las ventanas emergentes de Activos).
+- Lo visual de la interfaz nunca lo ha visto Claude: lo valida el usuario ejecutando la app (incluidas la tarjeta de los formularios, las ventanas emergentes de Activos y los diálogos de aviso).

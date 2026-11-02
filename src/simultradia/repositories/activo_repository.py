@@ -75,10 +75,9 @@ class ActivoRepository:
             cur.execute("UPDATE activos SET activo = %s WHERE id_activo = %s", (activo, id_activo))
             return cur.rowcount > 0
 
-    def actualizar(self, conn, id_activo: int, nombre: str, moneda: str) -> bool:
+    def actualizar_nombre(self, conn, id_activo: int, nombre: str) -> bool:
         with conn.cursor() as cur:
-            cur.execute("UPDATE activos SET nombre = %s, moneda = %s WHERE id_activo = %s",
-                        (nombre, moneda, id_activo))
+            cur.execute("UPDATE activos SET nombre = %s WHERE id_activo = %s", (nombre, id_activo))
             return cur.rowcount > 0
 
     def cambiar_fuente(self, conn, id_activo: int, id_fuente: int) -> bool:
