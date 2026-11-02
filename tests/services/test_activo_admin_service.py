@@ -148,26 +148,22 @@ class PruebasActivoAdminService(unittest.TestCase):
         self.assertEqual([i.activo.ticker for i in self.servicio.listar(ADMIN, texto="usdt", habilitado=True)], ["BTC/USDT"])
 
     # ---------------------------------------------------------------- editar
-    def test_editar_el_nombre_y_la_moneda(self):
-        self.servicio.editar(ADMIN, 1, "  Bitcoin (BTC) ", "usd")
-        self.assertEqual((self.repo.activos[0].nombre, self.repo.activos[0].moneda), ("Bitcoin (BTC)", "USD"))
-        self.assertEqual(self.repo.activos[0].ticker, "BTC/USDT")                # el ticker no se toca
+    def test_editar_el_nombre_no_toca_el_ticker_ni_la_moneda(self):
+        self.servicio.editar(ADMIN, 1, "  Bitcoin (BTC) ")
+        activo = self.repo.activos[0]
+        self.assertEqual((activo.nombre, activo.ticker, activo.moneda), ("Bitcoin (BTC)", "BTC/USDT", "USD"))
 
-    def test_editar_valida_cada_campo(self):
-        for nombre, moneda, campo in (("", "USD", "nombre"), ("B", "USD", "nombre"), ("Bitcoin", "", "moneda"),
-                                      ("Bitcoin", "DOLAR", "moneda"), ("Bitcoin", "U5D", "moneda")):
-            with self.subTest(nombre=nombre, moneda=moneda):
+    def test_editar_valida_el_nombre(self):
+        for nombre in ("", "B", "x" * 151):
+            with self.subTest(nombre=nombre):
                 with self.assertRaises(DatosInvalidos) as contexto:
-                    self.servicio.editar(ADMIN, 1, nombre, moneda)
-                self.assertEqual(list(contexto.exception.errores), [campo])
-        with self.assertRaises(DatosInvalidos) as contexto:
-            self.servicio.editar(ADMIN, 1, "", "x")
-        self.assertEqual(sorted(contexto.exception.errores), ["moneda", "nombre"])
+                    self.servicio.editar(ADMIN, 1, nombre)
+                self.assertEqual(list(contexto.exception.errores), ["nombre"])
         self.assertEqual(self.repo.activos[0].nombre, "Bitcoin")
 
     def test_editar_un_activo_inexistente(self):
         with self.assertRaises(ErrorOperacionInvalida):
-            self.servicio.editar(ADMIN, 99, "Algo", "USD")
+            self.servicio.editar(ADMIN, 99, "Algo")
 
     # ---------------------------------------------------------- probar ticker
     def test_probar_un_ticker_que_la_fuente_reconoce_no_guarda_nada(self):
@@ -196,7 +192,7 @@ class PruebasActivoAdminService(unittest.TestCase):
             with self.assertRaises(ErrorPermisos):
                 self.servicio.probar_ticker(actor, "BTC/USDT", "cripto", BINANCE)
             with self.assertRaises(ErrorPermisos):
-                self.servicio.editar(actor, 1, "Otro", "USD")
+                self.servicio.editar(actor, 1, "Otro")
         self.assertEqual(self.repo.activos[0].nombre, "Bitcoin")
 
     # ---------------------------------------------------------------- permisos

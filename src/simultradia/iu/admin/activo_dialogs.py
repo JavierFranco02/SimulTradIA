@@ -1,20 +1,22 @@
 """Ventanas emergentes de Administración · Activos: agregar y editar un activo.
 
 Son vistas pasivas: no llaman a ningún servicio. ActivosAdminView las abre y les reenvía lo que
-ordena el controlador (errores por campo, mensajes, «ocupado»).
+ordena el controlador (errores por campo, «ocupado»). Los errores de cada campo salen bajo el
+campo; cualquier otro aviso es un diálogo sobre esta misma ventana.
 """
 import tkinter as tk
+from tkinter import messagebox
 from typing import Callable, Dict, Sequence
 
 import ttkbootstrap as ttk
 
-from simultradia.iu.components import ActionButton, FormField, SelectField, StatusMessage
+from simultradia.iu.components import ActionButton, FormField, SelectField
 from simultradia.iu.components.select_field import Opcion
 from simultradia.iu.styles import ButtonStyle, Fonts, Spacing
 
 
 class _Dialogo(tk.Toplevel):
-    """Base: ventana modal centrada sobre la principal, con título, mensaje general y botones."""
+    """Base: ventana modal centrada sobre la principal, con título y botones."""
 
     def __init__(self, padre, titulo: str):
         super().__init__(padre)
@@ -29,8 +31,6 @@ class _Dialogo(tk.Toplevel):
         ttk.Label(cuerpo, text=titulo, font=Fonts.HEADING).pack(anchor="w")
         self.formulario = ttk.Frame(cuerpo)
         self.formulario.pack(fill="x")
-        self.mensaje = StatusMessage(cuerpo)
-        self.mensaje.pack(fill="x")
         self.botones = ttk.Frame(cuerpo)
         self.botones.pack(fill="x", pady=(Spacing.MD, 0))
         ActionButton(self.botones, "Cancelar", self.destroy, estilo=ButtonStyle.LINK).pack(side="left")
@@ -48,14 +48,19 @@ class _Dialogo(tk.Toplevel):
     def esta_viva(self) -> bool:
         return bool(self.winfo_exists())
 
+    def mostrar_error(self, texto: str) -> None:
+        messagebox.showerror("Error", texto, parent=self)
+
     def mostrar_errores(self, errores: Dict[str, str]) -> None:
-        """Cada mensaje bajo su campo; si no es de un campo de esta ventana, al mensaje general."""
+        """Cada mensaje bajo su campo; si no es de un campo de esta ventana, en un diálogo."""
         for clave, texto in errores.items():
             campo = self._campos.get(clave)
-            (self.mensaje if campo is None else campo).mostrar_error(texto)
+            if campo is None:
+                self.mostrar_error(texto)
+            else:
+                campo.mostrar_error(texto)
 
     def limpiar_errores(self) -> None:
-        self.mensaje.limpiar()
         for campo in self._campos.values():
             campo.ocultar_error()
 
@@ -91,21 +96,20 @@ class AgregarActivoDialog(_Dialogo):
 
 
 class EditarActivoDialog(_Dialogo):
-    def __init__(self, padre, id_activo: int, ticker: str, nombre: str, moneda: str,
-                 al_guardar: Callable[[int, str, str], None]):
+    """Solo se edita el nombre: la moneda no se cambia por activo (no hay conversión)."""
+
+    def __init__(self, padre, id_activo: int, ticker: str, nombre: str,
+                 al_guardar: Callable[[int, str], None]):
         super().__init__(padre, "Editar %s" % ticker)
         self._nombre = FormField(self.formulario, "Nombre", ancho=40)
-        self._moneda = FormField(self.formulario, "Moneda (3 letras)", ancho=40)
         self._nombre.pack(fill="x")
-        self._moneda.pack(fill="x")
         self._nombre.establecer(nombre)
-        self._moneda.establecer(moneda)
-        self._campos = {"nombre": self._nombre, "moneda": self._moneda}
+        self._campos = {"nombre": self._nombre}
 
         def guardar() -> None:
-            al_guardar(id_activo, self._nombre.obtener(), self._moneda.obtener())
+            al_guardar(id_activo, self._nombre.obtener())
 
         ActionButton(self.botones, "Guardar cambios", guardar).pack(side="right")
-        self._moneda.al_presionar_enter(guardar)
+        self._nombre.al_presionar_enter(guardar)
         self._nombre.enfocar()
         self._presentar()

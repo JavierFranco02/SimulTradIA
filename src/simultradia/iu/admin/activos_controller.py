@@ -52,22 +52,19 @@ class ActivosAdminController(PanelController):
     def probar_fuente(self, ticker: str, tipo: str, id_fuente: int) -> None:
         """Comprueba que la fuente elegida en "Pasar a" reconoce el ticker del activo elegido."""
         actor = self._session.usuario
-        self._vista.limpiar_mensaje()
         self._ejecutar(
             lambda: self._activos.probar_ticker(actor, ticker, tipo, id_fuente),
-            al_terminar=lambda fuente: self._vista.mostrar_exito("✓ %s reconoce %s." % (fuente, ticker.upper())),
+            al_terminar=lambda fuente: self._vista.mostrar_exito("%s reconoce %s." % (fuente, ticker.upper())),
             al_fallar=self._al_fallar_prueba)
 
-    def editar(self, id_activo: int, nombre: str, moneda: str) -> None:
+    def editar(self, id_activo: int, nombre: str) -> None:
         actor = self._session.usuario
-        self._vista.limpiar_mensaje()
         self._vista.limpiar_errores_edicion()
-        self._ejecutar(lambda: self._activos.editar(actor, id_activo, nombre, moneda),
+        self._ejecutar(lambda: self._activos.editar(actor, id_activo, nombre),
                        al_terminar=self._al_editar, al_fallar=self._al_fallar_edicion)
 
     def cambiar_estado(self, id_activo: int, habilitar: bool) -> None:
         actor = self._session.usuario
-        self._vista.limpiar_mensaje()
         self._ejecutar(lambda: self._activos.cambiar_estado(actor, id_activo, habilitar),
                        al_terminar=lambda _resultado: self.cargar())
 
@@ -76,7 +73,6 @@ class ActivosAdminController(PanelController):
                                      "guardadas y se descargarán de nuevo desde la fuente nueva."):
             return
         actor = self._session.usuario
-        self._vista.limpiar_mensaje()
         self._ejecutar(lambda: self._activos.cambiar_fuente(actor, id_activo, id_fuente),
                        al_terminar=lambda _resultado: self.cargar())
 
@@ -97,7 +93,7 @@ class ActivosAdminController(PanelController):
 
     def _al_probar(self, fuente: str, ticker: str) -> None:
         self._vista.establecer_ocupado(False)
-        self._vista.mostrar_exito("✓ %s reconoce %s." % (fuente, ticker.strip().upper()))
+        self._vista.mostrar_exito("%s reconoce %s." % (fuente, ticker.strip().upper()))
 
     def _al_editar(self, _resultado) -> None:
         self._vista.cerrar_edicion()
@@ -112,7 +108,7 @@ class ActivosAdminController(PanelController):
             self._al_fallar(error)
 
     def _al_fallar_prueba(self, error: Exception) -> None:
-        # Aquí no hay campos del formulario de alta: el motivo se muestra como mensaje general.
+        # Aquí no hay campos del formulario de alta: el motivo se muestra en un diálogo.
         self._al_fallar(error)
 
     def _al_fallar_edicion(self, error: Exception) -> None:

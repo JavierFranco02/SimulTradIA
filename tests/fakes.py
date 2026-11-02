@@ -196,10 +196,10 @@ class RepoActivoFalso:
                 return True
         return False
 
-    def actualizar(self, conn, id_activo, nombre, moneda):
+    def actualizar_nombre(self, conn, id_activo, nombre):
         for a in self.activos:
             if a.id_activo == id_activo:
-                a.nombre, a.moneda = nombre, moneda
+                a.nombre = nombre
                 return True
         return False
 
@@ -322,7 +322,7 @@ class VistaPanelFalsa:
         self.acciones = {}
         self.programadas = []      # (milisegundos, accion)
         self.error = self.exito = None
-        self.mensajes_limpiados = 0
+        self.errores_mostrados = []   # cada diálogo de error que se habría abierto
         self.eventos = []          # (nombre, argumentos) de cada mostrar_* / limpiar_*
         self.filtros_ = ("", None, None)
 
@@ -335,9 +335,12 @@ class VistaPanelFalsa:
     def valores(self): return dict(self._valores)
     def confirmar(self, mensaje): return self._confirma
     def establecer_ocupado(self, ocupado): self.ocupado = ocupado
-    def mostrar_error(self, texto): self.error = texto
+
+    def mostrar_error(self, texto):
+        self.error = texto
+        self.errores_mostrados.append(texto)
+
     def mostrar_exito(self, texto): self.exito = texto
-    def limpiar_mensaje(self): self.mensajes_limpiados += 1
     def limpiar_errores(self): self.eventos.append(("limpiar_errores", ()))
     def limpiar_formulario(self): self.eventos.append(("limpiar_formulario", ()))
     def limpiar_grafico(self): self.eventos.append(("limpiar_grafico", ()))
