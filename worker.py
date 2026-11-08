@@ -1,13 +1,14 @@
-"""Proceso SIN ventanas que mantiene los datos de mercado al día.
+"""Proceso SIN ventanas que mantiene los datos de mercado al día y ejecuta las órdenes pendientes.
 
 Se ejecuta en una terminal aparte, mientras la app está abierta:
 
     python worker.py
 
-  - cada 2 segundos: precio actual de todos los activos (lo que ve Mercado y el gráfico en vivo)
+  - cada 2 segundos: precio actual de todos los activos (lo que ve Mercado y el gráfico en vivo) y,
+    con esos precios, las órdenes límite que llegaron a su precio y los stop-loss / take-profit disparados
   - cada 60 segundos: velas nuevas (la primera vez descarga todo el historial; puede tardar)
 
-Solo PROGRAMA cuándo corre cada tarea; el trabajo está en jobs/ y en IngestaService.
+Solo PROGRAMA cuándo corre cada tarea; el trabajo está en jobs/ y en los servicios.
 Se detiene con Ctrl+C.
 """
 import logging
@@ -20,7 +21,7 @@ from simultradia.core.db import Database
 from simultradia.core.exceptions import ErrorBaseDatos
 from simultradia.core.logging_config import configurar_logging
 from simultradia.core.settings import SETTINGS
-from simultradia.jobs import actualizar_cotizaciones_job, actualizar_velas_job
+from simultradia.jobs import actualizar_cotizaciones_job, actualizar_velas_job, evaluar_ordenes_job
 
 _log = logging.getLogger("worker")
 
@@ -41,6 +42,7 @@ def main() -> int:
         while True:
             inicio = time.monotonic()
             actualizar_cotizaciones_job.ejecutar(servicios)
+            evaluar_ordenes_job.ejecutar(servicios)
             # Las velas van en su propio hilo: la primera descarga tarda y no debe frenar los precios.
             if inicio - ultima_pasada_velas >= 60 and not (hilo_velas and hilo_velas.is_alive()):
                 hilo_velas = threading.Thread(

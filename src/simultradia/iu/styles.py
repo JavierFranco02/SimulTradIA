@@ -47,7 +47,10 @@ class ButtonStyle:
     LINK = "link"                    # parece un enlace de texto
     DANGER_OUTLINE = "danger-outline"
     SUCCESS_OUTLINE = "success-outline"
+    LIGHT_OUTLINE = "light-outline"  # botón discreto y legible en tema oscuro (atajos como 25 %, 50 %...)
     TOGGLE = "outline-toolbutton"    # botón que queda "hundido" al elegirlo (pestañas, filtros)
+    TOGGLE_COMPRA = "success-outline-toolbutton"   # igual, en verde (comprar)
+    TOGGLE_VENTA = "danger-outline-toolbutton"     # igual, en rojo (vender)
     SWITCH = "round-toggle"          # interruptor deslizante (encendido/apagado)
 
 
@@ -72,6 +75,7 @@ class Fonts:
     HEADING = "simultradia.heading"
     SUBTITLE = "simultradia.subtitle"
     BODY = "simultradia.body"
+    VALUE = "simultradia.value"      # cifras importantes dentro de un formulario o tarjeta
     SMALL = "simultradia.small"
 
     # (tamaño, peso) de cada rol
@@ -81,6 +85,7 @@ class Fonts:
         HEADING: (18, "bold"),
         SUBTITLE: (11, "normal"),
         BODY: (10, "normal"),
+        VALUE: (12, "bold"),
         SMALL: (8, "normal"),
     }
 

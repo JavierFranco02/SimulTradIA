@@ -3,7 +3,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-from simultradia.iu.formato import compacto, dinero, hace, porcentaje, precio
+from simultradia.iu.formato import compacto, dinero, hace, porcentaje, precio, unidades
 
 E = "\u00a0"
 
@@ -30,6 +30,12 @@ class PruebasFormato(unittest.TestCase):
         self.assertEqual(precio(Decimal("67123.456")), "67%s123,46" % E)
         self.assertEqual(precio(Decimal("3.456789")), "3,4568")
         self.assertEqual(precio(Decimal("0.1234567")), "0,123457")
+
+    def test_unidades_sin_ceros_de_sobra(self):
+        self.assertEqual(unidades(Decimal("0.5000000000")), "0,5")
+        self.assertEqual(unidades(Decimal("1250")), "1%s250" % E)
+        self.assertEqual(unidades(Decimal("100")), "100")
+        self.assertEqual(unidades(Decimal("0.00012345")), "0,00012345")
 
     def test_numeros_grandes_abreviados(self):
         self.assertEqual(compacto(Decimal("950")), "950")

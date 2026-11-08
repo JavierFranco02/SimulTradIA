@@ -40,6 +40,14 @@ def precio(valor: Decimal) -> str:
     return _numero(valor, decimales)
 
 
+def unidades(valor: Decimal) -> str:
+    """Cantidad de un activo sin ceros de sobra: 0,5 · 1 250 · 0,00012345."""
+    texto = "{:f}".format(valor.normalize())
+    entero, _, decimales = texto.partition(".")
+    entero = "{:,}".format(int(entero)).replace(",", _ESPACIO)
+    return entero + ("," + decimales if decimales else "")
+
+
 def porcentaje(valor: Decimal, con_signo: bool = False) -> str:
     return _signo(valor, con_signo) + _numero(valor) + _ESPACIO + "%"
 

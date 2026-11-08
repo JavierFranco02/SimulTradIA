@@ -10,21 +10,25 @@ from simultradia.iu.shell.shell_view import ShellView
 _MENU = (
     ("inicio", "Inicio", False),
     ("mercado", "Mercado", False),
+    ("operar", "Operar", False),
     ("admin_usuarios", "Usuarios", True),
     ("admin_activos", "Activos", True),
     ("admin_ingesta", "Ingesta de datos", True),
 )
+# Secciones que el administrador no ve: él gestiona, no opera.
+_SOLO_USUARIOS = ("operar",)
 
 
 def _home(padre, nav):
-    menu = [(nombre, texto) for nombre, texto, solo_admin in _MENU if not solo_admin]
-    menu_admin = [(nombre, texto) for nombre, texto, solo_admin in _MENU
-                  if solo_admin and nav.session.es_admin]
+    es_admin = nav.session.es_admin
+    menu = [(nombre, texto) for nombre, texto, solo_admin in _MENU
+            if not solo_admin and not (es_admin and nombre in _SOLO_USUARIOS)]
+    menu_admin = [(nombre, texto) for nombre, texto, solo_admin in _MENU if solo_admin and es_admin]
     vista = ShellView(padre, nav.session.usuario, menu, menu_admin)
     ShellController(vista, nav.session, nav)
     return vista
 
 
 def registrar(navegador) -> None:
-    navegador.registrar("home", _home, tamano=(1100, 700), minimo=(900, 600),
+    navegador.registrar("home", _home, tamano=(1280, 780), minimo=(900, 600),
                         seccion_inicial="inicio")
