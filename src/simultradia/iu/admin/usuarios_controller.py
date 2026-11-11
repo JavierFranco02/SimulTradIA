@@ -23,7 +23,6 @@ class UsuariosController(PanelController):
                 "¿Desactivar esta cuenta? La persona no podrá iniciar sesión."):
             return
         actor = self._session.usuario
-        self._vista.limpiar_mensaje()
         self._ejecutar(lambda: self._servicio.cambiar_estado(actor, id_usuario, activar),
                        al_terminar=lambda _resultado: self.cargar())
 
@@ -32,7 +31,6 @@ class UsuariosController(PanelController):
                                      "dejará de funcionar y recibirás una temporal para entregarle."):
             return
         actor = self._session.usuario
-        self._vista.limpiar_mensaje()
         self._ejecutar(lambda: self._servicio.restablecer_password(actor, id_usuario),
                        al_terminar=lambda password: self._al_restablecer(id_usuario, password))
 

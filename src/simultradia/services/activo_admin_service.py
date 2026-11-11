@@ -5,7 +5,6 @@ tipos de activo y escribe sus tickers a su manera (lo declara su cliente); al ag
 comprueba que la fuente conozca el ticker. Las velas de un activo nuevo se descargan solas en
 la siguiente pasada de la ingesta.
 """
-import re
 from typing import Dict, List, Optional
 
 from simultradia.core.exceptions import DatosInvalidos, ErrorOperacionInvalida
@@ -16,8 +15,6 @@ from simultradia.domain.entities.usuario_entity import Usuario
 from simultradia.domain.enums import TipoActivo
 from simultradia.services.permisos import exigir_admin
 from simultradia.services.validacion import lanzar_si_hay_errores
-
-_PATRON_MONEDA = re.compile(r"^[A-Z]{3}$")
 
 
 class ActivoAdminService:
@@ -71,13 +68,14 @@ class ActivoAdminService:
             raise DatosInvalidos({"ticker": "%s no tiene ese ticker. Revisa que esté bien escrito." % fuente.nombre})
         return fuente.nombre
 
-    def editar(self, actor: Usuario, id_activo: int, nombre: str, moneda: str) -> None:
-        """Cambia el nombre y la moneda de un activo (el ticker y la fuente no se editan aquí)."""
+    def editar(self, actor: Usuario, id_activo: int, nombre: str) -> None:
+        """Cambia el nombre de un activo. El ticker y la fuente tienen su propio camino; la moneda
+        no se edita (no hay conversión: se definirá con la moneda de la aplicación)."""
         exigir_admin(actor)
-        nombre, moneda = (nombre or "").strip(), (moneda or "").strip().upper()
-        lanzar_si_hay_errores({"nombre": self._error_nombre(nombre), "moneda": self._error_moneda(moneda)})
+        nombre = (nombre or "").strip()
+        lanzar_si_hay_errores({"nombre": self._error_nombre(nombre)})
         with self._db.obtener_conexion() as conn:
-            if not self._activos.actualizar(conn, id_activo, nombre, moneda):
+            if not self._activos.actualizar_nombre(conn, id_activo, nombre):
                 raise ErrorOperacionInvalida("Ese activo no existe.")
 
     def cambiar_estado(self, actor: Usuario, id_activo: int, activo: bool) -> None:
@@ -156,12 +154,6 @@ class ActivoAdminService:
             return "Ingresa el nombre."
         if len(nombre) < 2 or len(nombre) > 150:
             return "El nombre debe tener entre 2 y 150 caracteres."
-        return None
-
-    @staticmethod
-    def _error_moneda(moneda: str) -> Optional[str]:
-        if not _PATRON_MONEDA.match(moneda):
-            return "Usa un código de 3 letras, por ejemplo USD."
         return None
 
     @staticmethod

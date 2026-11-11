@@ -1,5 +1,5 @@
 """Controlador de Administración · Ingesta: muestra el estado (se refresca solo), habilita fuentes
-y lanza la actualización manual."""
+y lanza la actualización manual. Los resultados y errores se avisan con diálogos."""
 from simultradia.iu.base.panel_controller import PanelController
 
 _CADA_MS = 5000
@@ -21,7 +21,6 @@ class IngestaController(PanelController):
         if self._vista.ocupado:
             return
         actor = self._session.usuario
-        self._vista.limpiar_mensaje()
         self._vista.establecer_ocupado(True)
         self._ejecutar(lambda: self._ingesta.ejecutar_manual(actor),
                        al_terminar=self._al_terminar_manual, al_fallar=self._al_fallar_manual)
@@ -31,7 +30,6 @@ class IngestaController(PanelController):
         if self._vista.ocupado:
             return
         actor = self._session.usuario
-        self._vista.limpiar_mensaje()
         self._vista.establecer_ocupado(True)
         self._ejecutar(lambda: self._ingesta.ejecutar_manual(actor, id_fuente),
                        al_terminar=self._al_terminar_manual, al_fallar=self._al_fallar_manual)
@@ -41,7 +39,6 @@ class IngestaController(PanelController):
         if self._vista.ocupado:
             return
         actor = self._session.usuario
-        self._vista.limpiar_mensaje()
         self._vista.establecer_ocupado(True)
         self._ejecutar(lambda: self._ingesta.probar_fuente(actor, id_fuente),
                        al_terminar=self._al_probar, al_fallar=self._al_fallar_manual)
@@ -51,7 +48,6 @@ class IngestaController(PanelController):
                 "¿Deshabilitar esta fuente? Sus activos dejarán de actualizarse."):
             return
         actor = self._session.usuario
-        self._vista.limpiar_mensaje()
         self._ejecutar(lambda: self._fuentes.cambiar_estado(actor, id_fuente, activar),
                        al_terminar=lambda _resultado: self._pedir_estado())
 
@@ -65,7 +61,12 @@ class IngestaController(PanelController):
     def _pedir_estado(self) -> None:
         actor = self._session.usuario
         self._ejecutar(lambda: (self._ingesta.obtener_estado(actor), self._fuentes.listar(actor)),
-                       al_terminar=lambda resultado: self._vista.mostrar_estado(*resultado))
+                       al_terminar=self._al_estado,
+                       al_fallar=lambda error: self._avisar_una_vez("estado", error))
+
+    def _al_estado(self, resultado) -> None:
+        self._recuperado("estado")
+        self._vista.mostrar_estado(*resultado)
 
     def _al_terminar_manual(self, resultado) -> None:
         self._vista.establecer_ocupado(False)

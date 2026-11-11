@@ -153,18 +153,24 @@ class PruebasActivosAdminController(_Base):
         vista.acciones["al_filtrar"]()
         self.assertEqual(servicio.llamadas[-1], ("listar", self.sesion.usuario, "btc", "cripto", False))
 
-    def test_editar_guarda_y_recarga(self):
+    def test_editar_guarda_solo_el_nombre_avisa_y_recarga(self):
         vista, servicio, *_ = self._crear(listar=[])
-        vista.acciones["al_editar"](4, "Bitcoin (BTC)", "usd")
-        self.assertEqual(servicio.llamadas[0], ("editar", self.sesion.usuario, 4, "Bitcoin (BTC)", "usd"))
+        vista.acciones["al_editar"](4, "Bitcoin (BTC)")
+        self.assertEqual(servicio.llamadas[0], ("editar", self.sesion.usuario, 4, "Bitcoin (BTC)"))
         self.assertEqual(vista.exito, "Cambios guardados.")
+        self.assertIsNotNone(vista.ultimo("cerrar_edicion"))
         self.assertEqual(servicio.llamadas[-1][0], "listar")
 
     def test_los_errores_de_la_edicion_van_a_sus_campos(self):
-        vista, *_ = self._crear(editar=DatosInvalidos({"moneda": "Usa un código de 3 letras, por ejemplo USD."}))
-        vista.acciones["al_editar"](4, "Bitcoin", "xx")
-        self.assertEqual(vista.ultimo("errores_edicion"), {"moneda": "Usa un código de 3 letras, por ejemplo USD."})
+        vista, *_ = self._crear(editar=DatosInvalidos({"nombre": "Ingresa el nombre."}))
+        vista.acciones["al_editar"](4, "")
+        self.assertEqual(vista.ultimo("errores_edicion"), {"nombre": "Ingresa el nombre."})
         self.assertIsNone(vista.error)
+
+    def test_un_error_que_no_es_de_campo_al_editar_se_muestra_como_aviso(self):
+        vista, *_ = self._crear(editar=ErrorOperacionInvalida("Ese activo no existe."))
+        vista.acciones["al_editar"](99, "Algo")
+        self.assertEqual(vista.error, "Ese activo no existe.")
 
     def test_probar_un_ticker_avisa_que_la_fuente_lo_reconoce_y_no_agrega_nada(self):
         vista, servicio, *_ = self._crear(probar_ticker="Yahoo Finance")
@@ -218,6 +224,13 @@ class PruebasIngestaController(_Base):
         controlador.cargar()
         self.assertEqual(vista.ultimo("estado"), ("ESTADO", ["F1"]))
         self.assertEqual([ms for ms, _ in vista.programadas], [5000])
+
+    def test_si_el_refresco_falla_una_y_otra_vez_el_error_se_avisa_una_sola_vez(self):
+        vista, *_, controlador = self._crear(obtener_estado=ErrorOperacionInvalida("Base caída"))
+        controlador.cargar()
+        for _ in range(3):
+            vista.programadas[-1][1]()
+        self.assertEqual(vista.errores_mostrados, ["Base caída"])
 
     def test_actualizacion_manual_correcta(self):
         vista, *_ = self._crear(ejecutar_manual=ResultadoIngesta(62, []), obtener_estado="E")

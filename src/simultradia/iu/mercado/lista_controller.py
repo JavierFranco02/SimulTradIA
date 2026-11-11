@@ -3,6 +3,7 @@
   - Buscar, cambiar de categoría o de pestaña, u ordenar vuelve a pedir la lista de inmediato.
   - Si llega una respuesta vieja (el usuario ya buscó otra cosa), se descarta.
   - Al terminar la primera carga elige el primer activo, para que el gráfico no empiece vacío.
+  - Si la consulta falla y sigue fallando, el error se avisa una sola vez (no un diálogo cada 3 s).
 """
 from simultradia.iu.base.panel_controller import PanelController
 
@@ -72,6 +73,7 @@ class ListaController(PanelController):
         self._cargando = False
         if numero != self._solicitud:   # llegó una respuesta vieja
             return
+        self._recuperado("panel")
         self._vista.mostrar_panel(panel, orden, descendente)
         if not self._eligio_primero and panel.items:
             self._eligio_primero = True
@@ -79,4 +81,4 @@ class ListaController(PanelController):
 
     def _al_fallar_carga(self, error: Exception) -> None:
         self._cargando = False
-        self._al_fallar(error)
+        self._avisar_una_vez("panel", error)

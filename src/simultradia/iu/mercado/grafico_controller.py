@@ -4,6 +4,7 @@
   - Cada ~30 s recarga las velas guardadas, que el worker va completando.
   - Cambiar de intervalo solo cambia qué velas se leen; la cotización es la misma.
   - Las respuestas que llegan tarde (de otro activo u otro intervalo) se descartan.
+  - Si una consulta periódica falla y sigue fallando, el error se avisa una sola vez.
 """
 from simultradia.domain.enums import IntervaloVela
 from simultradia.iu.base.panel_controller import PanelController
@@ -40,6 +41,7 @@ class GraficoController(PanelController):
         self._tipo = self._cotizacion = self._datos = self._ultimo_precio = None
         self._peticion_activo += 1
         self._consultando = False
+        self._fallando.clear()        # otro activo: si falla, se avisa de nuevo
         self._vista.limpiar_grafico()
         self._cargar_velas()
         self._consultar()
@@ -60,11 +62,13 @@ class GraficoController(PanelController):
         self._ejecutar(
             lambda: self._grafico.obtener_datos(id_activo, intervalo),
             al_terminar=lambda datos: self._al_velas(numero, intervalo, datos),
+            al_fallar=lambda error: self._avisar_una_vez("velas", error),
         )
 
     def _al_velas(self, numero: int, intervalo: IntervaloVela, datos) -> None:
         if numero != self._peticion_velas:
             return
+        self._recuperado("velas")
         if self._cotizacion is not None:   # que la vela abierta ya muestre el precio de ahora
             datos = self._grafico.con_precio(datos, self._cotizacion, intervalo, self._tipo)
         self._datos = datos
@@ -93,7 +97,7 @@ class GraficoController(PanelController):
         if numero != self._peticion_activo:   # respuesta de un activo que ya no está elegido
             return
         self._consultando = False
-        self._vista.limpiar_mensaje()
+        self._recuperado("consulta")
         self._vista.mostrar_activo(item)
         self._tipo, cotizacion = item.activo.tipo, item.cotizacion
         self._cotizacion = cotizacion
@@ -105,4 +109,4 @@ class GraficoController(PanelController):
 
     def _al_fallar_consulta(self, error: Exception) -> None:
         self._consultando = False
-        self._al_fallar(error)
+        self._avisar_una_vez("consulta", error)
