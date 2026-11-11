@@ -26,7 +26,7 @@ class MercadoView(PanelView):
         self._al_operar: Optional[Callable[[int], None]] = None
         self._id_activo: Optional[int] = None
         cabecera = ttk.Frame(self)
-        cabecera.pack(fill="x", pady=(0, Spacing.SM), before=self._mensaje)
+        cabecera.pack(fill="x", pady=(0, Spacing.SM))
         ttk.Label(cabecera, text="Mercado", font=Fonts.HEADING).pack(side="left")
         self._boton_lista = ActionButton(cabecera, "◀ Ocultar lista", self._alternar_lista,
                                          estilo=ButtonStyle.LINK)

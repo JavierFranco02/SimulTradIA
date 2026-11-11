@@ -35,7 +35,7 @@ una fecha pasada mientras las velas avanzan) · **coach de IA** (analiza las ope
 Sin apalancamiento, sin margen y solo posiciones largas (vender cierra o reduce lo que se tiene).
 
 **Administrador:** usuarios (listar, desactivar/reactivar, reiniciar cuenta, rol) · activos (agregar por ticker,
-editar, desactivar, **elegir, probar y cambiar su fuente de datos**) · ingesta de datos (estado, fuentes, probar conexión,
+editar el nombre, desactivar, **elegir, probar y cambiar su fuente de datos**) · ingesta de datos (estado, fuentes, probar conexión,
 ejecución manual de todo o de una fuente) · **contraseña temporal** para quien olvidó la suya ·
 modelos de IA (métricas, precisión real, reentrenar, activar o revertir versión) · glosario · panel de resumen ·
 auditoría. El admin nunca ve contraseñas ni opera dentro de la cuenta de un usuario (ni ve la pantalla Operar); sus
@@ -45,6 +45,8 @@ permisos se validan en los servicios, no solo ocultando botones; el primer admin
 **Opcional si sobra tiempo:** alertas, varias cuentas simuladas, predicción de volatilidad.
 **Descartado:** social, tutoriales y retos, chat asistente, datos fundamentales, calendario, posiciones cortas,
 apalancamiento, guardar configuraciones de gráfico, exportar PDF/CSV.
+**Previsto más adelante:** una **moneda de la aplicación** configurable, con cambio de moneda según tasa de cambio
+(hoy cada activo guarda su moneda al crearse y no se edita; ver decisión 34).
 
 ### Enfoque de la IA
 - Predicción de **dirección con probabilidades** (`prob_alcista + prob_bajista + prob_lateral = 1`) y confianza.
@@ -70,6 +72,8 @@ apalancamiento, guardar configuraciones de gráfico, exportar PDF/CSV.
    repo, archivos completos). **No des código para copiar y pegar** ni fragmentos por archivo: esa mecánica ya no se
    usa. Junto al zip, di solo qué archivos se **agregaron**, cuáles se **modificaron** y cuáles hay que **borrar a
    mano** (un zip no puede borrar), más lo que no pudiste verificar. Mantén tu copia interna del proyecto actualizada.
+   **Incluye `contexto_SimulTradIA.md` en el zip cuando el cambio toque arquitectura, decisiones o estado** (el texto
+   completo está en el contexto del proyecto: no hace falta que el usuario lo pida).
 4. **Lee el archivo actual antes de modificarlo o sobrescribirlo.** Puede haber cambiado desde la última vez
    que lo viste. Si no tienes el código a mano, pídelo antes de escribir cambios.
 5. **Respeta la arquitectura y su estructura de carpetas** (secciones 4 y 5). Si algo no encaja, propón
@@ -127,7 +131,7 @@ Vista ──callbacks (vincular_acciones)──► Controlador ──► Servici
 
 | Capa | Hace | No hace |
 |---|---|---|
-| **Vista** (`iu/<módulo>/*_view.py`) | Dibuja widgets; expone métodos para leer y mostrar datos. Pasiva. | Lógica, SQL, llamar a servicios. |
+| **Vista** (`iu/<módulo>/*_view.py`) | Dibuja widgets; expone métodos para leer y mostrar datos (y abrir los diálogos de aviso). Pasiva. | Lógica, SQL, llamar a servicios. |
 | **Controlador** (`iu/<módulo>/*_controller.py`) | Intermediario: lee la vista, lanza el trabajo en segundo plano, decide qué hacer con el resultado (navegar con `navegador.ir_a`, mostrar error, abrir/cerrar sesión, refrescar cada pocos segundos). | Importar vistas (recibe la vista ya creada). |
 | **Servicio** (`services`) | Reglas de negocio y **validaciones**. Abre la transacción y llama a **repositorios** y **clientes** (combina repositorios, no llama transacciones de otros servicios). Los métodos de administración y de operar reciben el `actor` y llaman a `exigir_admin` / `exigir_operador`. | Conocer tkinter o escribir SQL. Llamar a una API externa con una conexión de BD abierta. |
 | **Repositorio** (`repositories`) | **Único lugar con SQL.** Convierte filas en entidades leyendo por **nombre de columna**. | Reglas de negocio. Concatenar SQL con datos: siempre parámetros `%s`. |
@@ -177,9 +181,10 @@ src/simultradia/
     navegacion.py    Navegador: ir_a("nombre", **parametros)
     rutas.py         registra las pantallas de todos los módulos
     components/      clases reutilizables: ActionButton, Card, FormField, PasswordField, ShowPasswordToggle,
-                     StatusMessage, DataTable, SelectField, ScrollFrame, Dialogo (base de ventanas emergentes),
+                     StatusMessage (solo errores de formulario), DataTable, SelectField, ScrollFrame, Dialogo (base de ventanas emergentes),
                      CandleChart (+ candle_render.py: dibuja con matplotlib, sin tkinter)
     base/            FormView/FormController (formularios, dibujados dentro de una tarjeta con borde) y PanelView/PanelController (secciones)
+
     auth/            login, registro y cambio de contraseña temporal (vistas, controladores, pantallas.py)
     shell/           ventana "home": menú lateral + área de contenido (ShellView, ShellController)
     inicio/          sección de bienvenida (PROVISIONAL: se rehace al final)
@@ -187,8 +192,8 @@ src/simultradia/
                      grafico_view (con modo compacto)/grafico_controller
     operar/          operar_view (ticket + gráfico + pestañas), operar_controller, proteccion_dialog (SL/TP), pantallas.py
     admin/           usuarios, activos, ingesta: cada uno con su vista y su controlador;
-                     activo_dialogs.py = ventanas emergentes de Activos (agregar y editar)
-    <módulo>/        portafolio/, backtesting/, ia/... cuando lleguen
+                     activo_dialogs.py = ventanas emergentes de Activos (agregar y editar el nombre)
+    <módulo>/        trading/, backtesting/, ia/... cuando lleguen
 ```
 **(previsto)** = la carpeta existe solo con su `__init__.py` y un docstring; se llena cuando llegue su módulo.
 Cada módulo de `iu/` tiene su `pantallas.py` con `registrar(navegador)`; `iu/rutas.py` los junta.
@@ -224,9 +229,18 @@ El paquete se llama **`simultradia`** (no `main`: chocaría con `main.py`).
   `DatosInvalidos` (lleva `{campo: mensaje}` y el controlador lo reparte **bajo cada campo**), `ErrorPermisos`,
   `ErrorOperacionInvalida` (una acción que no se puede hacer), `ErrorServicioExterno` (falló una API de afuera),
   `ErrorBaseDatos`, `CredencialesInvalidas`, `CuentaDesactivada`. Los errores que no son de un campo van al
-  **mensaje general**. Cualquier otra excepción es inesperada: se registra en el log y el usuario ve un mensaje
-  genérico. Las claves de campo (`"nombre"`, `"email"`, `"password"`, `"ticker"`, `"cantidad"`, `"precio_limite"`,
-  `"stop_loss"`, `"take_profit"`, `"riesgo"`...) son compartidas entre servicio y vista.
+  **mensaje general**: en un formulario (login, registro...) es el texto de error del formulario; en una sección del
+  panel es un **diálogo**. Cualquier otra excepción es inesperada: se registra en el log y el usuario ve un mensaje
+  genérico. Las claves de campo (`"nombre"`, `"email"`, `"password"`, `"ticker"`...) son compartidas entre servicio y vista.
+- **Avisos al usuario (diálogos):** en las secciones del panel (`PanelView`) `mostrar_error` y `mostrar_exito` abren un
+  diálogo (`messagebox`) sobre la pantalla; nada de texto fijo que se quede ahí. Las vistas con ventanas emergentes
+  (Activos) sobreescriben `_padre_aviso()` para abrir el diálogo sobre la ventana emergente si hay una abierta. Un estado
+  que se repite en cada refresco (p. ej. "Sin precios todavía" en la lista de Mercado) NO es un aviso: va como texto en la
+  propia pantalla (el pie de la lista). En los **refrescos periódicos** (lista y gráfico de Mercado, estado de Ingesta)
+  un fallo que se mantiene se avisa UNA sola vez: `PanelController._avisar_una_vez(clave, error)` y
+  `_recuperado(clave)`; si no, saldría un diálogo cada pocos segundos. La confirmación "¡Cuenta creada!" del login
+  también es un diálogo. Los formularios siguen mostrando el error de cada campo bajo su campo y el error general en
+  el propio formulario (`StatusMessage`, que solo muestra errores).
 - **Permisos:** los métodos de administración reciben `actor: Usuario` (el controlador pasa `session.usuario`) y
   llaman a `exigir_admin(actor)` (`services/permisos.py`), que lanza `ErrorPermisos`. Operar usa `exigir_operador(actor)`:
   rechaza al admin y a quien no ha iniciado sesión.
@@ -247,7 +261,9 @@ El paquete se llama **`simultradia`** (no `main`: chocaría con `main.py`).
 - **Ventanas emergentes:** `Dialogo` (components) es la base: modal, centrada sobre la principal, con mensaje general y
   errores por campo. La usan Activos (`iu/admin/activo_dialogs.py`: agregar y editar) y Operar (`proteccion_dialog.py`:
   stop-loss y take-profit). Son vistas pasivas que abre la vista de la sección; esta conserva la misma interfaz hacia el
-  controlador y reenvía a la ventana abierta los errores por campo y los mensajes (`_destino()`).
+  controlador y reenvía a la ventana abierta los errores por campo y los mensajes (`_destino()`).. Los errores que no son de un campo y las confirmaciones salen en un diálogo sobre la
+  ventana. Al agregar con éxito la ventana se cierra; doble clic en una fila abre la edición. **Editar solo cambia el
+  nombre**: la moneda de un activo no se edita (decisión 34).
 - **Probar y actualizar por fuente:** `IngestaService.probar_fuente` le pide a la fuente el precio de su activo de
   ejemplo (`EJEMPLO_TICKER` del cliente) y mide cuánto tarda, sin guardar nada; un fallo se devuelve como resultado, no
   como error. `ejecutar_manual(actor, id_fuente)` actualiza solo una fuente (debe estar habilitada).
@@ -330,10 +346,11 @@ El paquete se llama **`simultradia`** (no `main`: chocaría con `main.py`).
 4. En el `pantallas.py` del módulo, una fábrica y su `registrar` (`navegador.registrar("nombre", fabrica, ...)`).
 
 **Sección del panel** (mercado, portafolio, administración...): carpeta `iu/<módulo>/` con vista (hereda de
-`PanelView`: título, mensaje general, `esta_viva()` y `programar(ms, accion)` para refrescos que se cancelan solos),
-controlador (hereda de `PanelController`: `_ejecutar` descarta resultados de pantallas cerradas y muestra errores) y
-`pantallas.py` registrando con `en_shell=True`; sumar el módulo en `iu/rutas.py` y su botón en `_MENU` de
-`iu/shell/pantallas.py`. Los refrescos periódicos se encadenan con `vista.programar` y comprueban `esta_viva()`.
+`PanelView`: título, avisos en diálogos con `mostrar_error`/`mostrar_exito`, `esta_viva()` y `programar(ms, accion)`
+para refrescos que se cancelan solos), controlador (hereda de `PanelController`: `_ejecutar` descarta resultados de
+pantallas cerradas y muestra errores; `_avisar_una_vez` para consultas periódicas) y `pantallas.py` registrando con
+`en_shell=True`; sumar el módulo en `iu/rutas.py` y su botón en `_MENU` de `iu/shell/pantallas.py`. Los refrescos
+periódicos se encadenan con `vista.programar` y comprueban `esta_viva()`.
 
 ---
 
@@ -419,12 +436,19 @@ lo que hace: `autenticar` verifica y no inicia sesión; el controlador es quien 
 35. **Mercado explora y Operar ejecuta (opción C):** Mercado conserva su lista y su gráfico completo; Operar tiene su propio gráfico compacto y un selector de activo. «Operar este activo» (Mercado) abre Operar con ese activo. El administrador no ve Operar ni el botón.
 36. **Stop-loss y take-profit viven en la posición** (no como órdenes hijas): más simples, sin sincronizar cantidades ni cancelar parejas. Contrapartida: un solo SL y un solo TP por activo.
 37. **Las órdenes límite no reservan saldo:** se valida al enviar y al ejecutar; si falla al ejecutar, queda `rechazada` con motivo. (Reservar exigiría una columna de saldo reservado.) Las órdenes rechazadas SOLO se guardan cuando fallan al ejecutarse; un rechazo al enviarla es un error en pantalla.
-38. **Un solo tipo de moneda por cuenta, sin conversión:** los activos en otra moneda no se operan todavía.
-39. **El mercado cerrado no se controla (todavía):** una orden a mercado, un límite o un stop-loss se evalúa contra el último precio guardado, aunque el mercado esté cerrado o el precio esté viejo. Queda para más tarde (ver sección 10).
-40. **Deslizamiento opcional por cuenta** (`deslizamiento_pct`, 0 por defecto), solo para mercado y stop-loss.
-41. **Operar pide todo su estado en una sola llamada** (`obtener_estado`) por el límite de 5 conexiones del pool.
-42. **La calculadora de riesgo arriesga un % del patrimonio** (saldo + posiciones), con el stop a 2 ATR diarios; cuenta comisiones de compra y venta, no deslizamiento. Es solo para compras.
-43. **Las ventanas emergentes comparten la base `Dialogo`** (components) en vez de que cada módulo tenga la suya.
+38. **El mercado cerrado no se controla (todavía):** una orden a mercado, un límite o un stop-loss se evalúa contra el último precio guardado, aunque el mercado esté cerrado o el precio esté viejo. Queda para más tarde (ver sección 10).
+39. **Deslizamiento opcional por cuenta** (`deslizamiento_pct`, 0 por defecto), solo para mercado y stop-loss.
+40. **Operar pide todo su estado en una sola llamada** (`obtener_estado`) por el límite de 5 conexiones del pool.
+41. **La calculadora de riesgo arriesga un % del patrimonio** (saldo + posiciones), con el stop a 2 ATR diarios; cuenta comisiones de compra y venta, no deslizamiento. Es solo para compras.
+42. **Las ventanas emergentes comparten la base `Dialogo`** (components) en vez de que cada módulo tenga la suya.
+43. **La moneda de un activo NO se edita** (no hay función de conversión y no tiene sentido cambiarla activo por activo): se
+    asigna al agregarlo (USD; en divisas de Yahoo, la segunda moneda del par) y `ActivoAdminService.editar(actor, id, nombre)`
+    solo cambia el nombre. Más adelante se añadirá una **moneda de la aplicación** configurable, con cambio de moneda según
+    tasa de cambio.
+44. **Los avisos de éxito o error de las secciones del panel son diálogos,** no un texto fijo en la pantalla (un "guardado" o un
+    error no debe quedarse escrito cuando ya no importa). Los estados que se repiten en cada refresco van como texto en la
+    pantalla; los fallos de los refrescos periódicos se avisan una sola vez (`_avisar_una_vez`). Los formularios conservan el
+    error bajo cada campo y el error general en el propio formulario. Ver sección 4.3 ("Avisos al usuario").
 
 ---
 
@@ -477,9 +501,9 @@ PostgreSQL 9.3, claves `id_<entidad>` y los tipos de abajo.
 ## 8. Pruebas
 
 - Desde la raíz: `python -m unittest discover -s tests -t . -v` (con `pip install -e .` hecho). No necesitan PostgreSQL, ventanas ni internet.
-- Estructura: `tests/fakes.py` (falsos compartidos) y subcarpetas `core/`, `services/`, `iu/`, `analisis/`, `clients/`, `domain/`, cada una con `__init__.py`; se importa `from tests.fakes import ...`.
-- **Servicios:** `DatabaseFalsa`, `RepositorioFalso`, `CuentaRepositorioFalso`, `RepoActivoFalso`, `RepoPrecioFalso` (cotizaciones y velas), `RepoFuenteFalso`, `UsuarioRepoAdminFalso`, `ClienteMercadoFalso` (hace de una fuente y declara sus tipos, formato de ticker y ritmo). Las pruebas de Operar definen en su propio archivo los falsos de cuentas, posiciones y órdenes (con las operaciones que usa el worker).
-- **Controladores:** `VistaFalsa` (formularios), `VistaPanelFalsa` (secciones; anota lo que le ordenan; las pruebas de Operar la extienden con los métodos propios de su vista), `NavegadorFalso`, `ServicioFalso`, `ServicioGenerico` (responde cualquier método con lo que se le prepare) y una `Session()` propia por prueba. `ejecutar_en_hilo` se reemplaza con `mock.patch(...)` en `simultradia.iu.base.form_controller` o `simultradia.iu.base.panel_controller` (en el acto, o diferido con `EjecutorDiferido`).
+- Estructura: `tests/fakes.py` (falsos compartidos) y subcarpetas `core/`, `services/`, `iu/`, `analisis/`, `clients/`, cada una con `__init__.py`; se importa `from tests.fakes import ...`.
+- **Servicios:** `DatabaseFalsa`, `RepositorioFalso`, `CuentaRepositorioFalso`, `RepoActivoFalso`, `RepoPrecioFalso`, `RepoFuenteFalso`, `UsuarioRepoAdminFalso`, `ClienteMercadoFalso` (hace de una fuente y declara sus tipos, formato de ticker y ritmo).
+- **Controladores:** `VistaFalsa` (formularios), `VistaPanelFalsa` (secciones; anota lo que le ordenan, y cada diálogo de error que se habría abierto en `errores_mostrados`), `NavegadorFalso`, `ServicioFalso`, `ServicioGenerico` (responde cualquier método con lo que se le prepare) y una `Session()` propia por prueba. `ejecutar_en_hilo` se reemplaza con `mock.patch(...)` en `simultradia.iu.base.form_controller` o `simultradia.iu.base.panel_controller` (en el acto, o diferido con `EjecutorDiferido`). `tests/iu/test_panel_controller.py` prueba el aviso único de los refrescos periódicos.
 - **Navegador:** `VentanaFalsa`, `PantallaFalsa`, `ShellFalso`.
 - **Dominio, análisis, formato y gráfico:** puro Python; las reglas de operar en `tests/domain/`; el dibujo (`candle_render`) se prueba con una `Figure` de matplotlib y `savefig`. Las pruebas del cliente de Yahoo usan tablas de pandas armadas a mano (se saltan si pandas no está).
 - **Las vistas de tkinter NO se prueban** (nadie las ejecuta fuera de la app): un error de armado solo aparece al abrir la pantalla.
@@ -500,7 +524,9 @@ pocas filas · un servicio por rol en lugar de por tema · **entregar código pa
 **reutilizar el nombre de una variable para dos widgets distintos en un método que arma una pantalla** (y luego devolver
 la equivocada) · lanzar varias consultas a la vez desde una pantalla que refresca (el pool es de 5) · escribir en la
 base antes de terminar de validar (una orden rechazada no debe dejar nada a medias) · bloquear en distinto orden (siempre
-cuenta primero, luego orden) · apalancamiento, margen o posiciones cortas.
+cuenta primero, luego orden) · apalancamiento, margen o posiciones cortas · **mensajes de éxito o error de una sección como texto fijo en la
+pantalla (van en diálogo)** · **un diálogo de error en cada vuelta de un refresco periódico** · **editar la moneda de un
+activo suelto**.
 
 ---
 
@@ -513,7 +539,7 @@ cuenta primero, luego orden) · apalancamiento, margen o posiciones cortas.
   RSI y MACD. Botón «Operar este activo».
 - **Datos:** worker con ingesta por fuente (Binance y Yahoo Finance), cada una a su ritmo.
 - **Administración:** Usuarios (buscar y filtrar, activar/desactivar, restablecer contraseña con una temporal), Activos
-  (buscar y filtrar, agregar y editar en ventanas emergentes, probar ticker, habilitar, probar y cambiar fuente) e
+  (buscar y filtrar, agregar y editar el nombre en ventanas emergentes, probar ticker, habilitar, probar y cambiar fuente) e
   Ingesta de datos (estado, habilitar fuentes, probar conexión, actualizar una fuente o todo).
 - **Operar (fases 1 a 3):** ticket con estimación en vivo, atajos de cantidad, órdenes a mercado y límite, stop-loss y
   take-profit (al comprar o editándolos en la posición), posiciones con P&L en vivo, cerrar una o todas, órdenes
@@ -529,6 +555,7 @@ cuenta primero, luego orden) · apalancamiento, margen o posiciones cortas.
 - Al cerrar una posición, sus órdenes de venta pendientes no se cancelan solas: se rechazan al dispararse.
 - Orden de compra por **monto** en dinero (hoy solo por cantidad); más de un SL/TP por activo; stop de compra y stop-límite (el tipo existe en la base, sin uso).
 - Reservar saldo para las órdenes límite (decisión 37).
+- **Avisos:** errores y confirmaciones de las secciones en diálogos (decisión 44); la moneda por activo ya no se edita (decisión 43).
 
 **Pendiente de administración (próxima mejora)**
 - Usuarios: **cambiar el rol** (decidido a medias: ver más abajo), reiniciar la cuenta (ahora que existen las tablas de operar,
@@ -550,6 +577,7 @@ cuenta primero, luego orden) · apalancamiento, margen o posiciones cortas.
 `snapshots_portafolio`, ganancia por operación cerrada con `operaciones_cerradas`; las posiciones abiertas y su P&L ya viven
 en Operar, así que Portafolio es el análisis) → Watchlist → noticias → IA → Backtesting → Replay → Coach → Glosario →
 **Inicio** (al final).
+Más adelante: **moneda de la aplicación** (configuración + cambio de moneda con tasa de cambio).
 
 **Deuda técnica conocida**
 - Renombrar `UsuarioService` a `AuthService` y usar `validacion.py` en lugar de su copia de `_lanzar_si_hay_errores` (aplazado al final del proyecto).

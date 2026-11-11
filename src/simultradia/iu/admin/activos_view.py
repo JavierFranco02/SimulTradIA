@@ -1,7 +1,8 @@
 """Administración · Activos: catálogo de lo que se puede ver y operar, y de dónde viene cada uno.
 
 Agregar y editar se hacen en ventanas emergentes (activo_dialogs.py): esta vista las abre y les
-reenvía los errores y mensajes que ordena el controlador.
+reenvía los errores que ordena el controlador. Los avisos (error o éxito) son diálogos y se abren
+sobre la ventana emergente si hay una abierta, o sobre el panel si no.
 """
 import tkinter as tk
 from tkinter import messagebox
@@ -37,7 +38,7 @@ class ActivosAdminView(PanelView):
         self._al_probar_ticker: Optional[Callable[[], None]] = None
         self._al_probar_fuente: Optional[Callable[[str, str, int], None]] = None
         self._al_filtrar: Optional[Callable[[], None]] = None
-        self._al_editar: Optional[Callable[[int, str, str], None]] = None
+        self._al_editar: Optional[Callable[[int, str], None]] = None
         self._items: Dict[str, ActivoCotizado] = {}
         self._opciones_fuentes: List[Tuple[str, str]] = []
         self._dialogo_agregar: Optional[AgregarActivoDialog] = None
@@ -97,7 +98,7 @@ class ActivosAdminView(PanelView):
                           al_probar_ticker: Callable[[], None],
                           al_probar_fuente: Callable[[str, str, int], None],
                           al_filtrar: Callable[[], None],
-                          al_editar: Callable[[int, str, str], None]) -> None:
+                          al_editar: Callable[[int, str], None]) -> None:
         self._al_agregar = al_agregar
         self._al_cambiar_estado = al_cambiar_estado
         self._al_cambiar_fuente = al_cambiar_fuente
@@ -115,7 +116,6 @@ class ActivosAdminView(PanelView):
         return dialogo is not None and dialogo.esta_viva()
 
     def _abrir_agregar(self) -> None:
-        self._mensaje.limpiar()
         self._dialogo_agregar = AgregarActivoDialog(
             self, [(t.value, texto) for t, texto in TIPO_SINGULAR.items()], self._opciones_fuentes,
             al_agregar=self._pulsar_agregar, al_probar=self._pulsar_probar_ticker)
@@ -124,26 +124,16 @@ class ActivosAdminView(PanelView):
         elegido = self._elegido()
         if elegido is None:
             return
-        self._mensaje.limpiar()
         a = elegido.activo
         self._dialogo_editar = EditarActivoDialog(
-            self, a.id_activo, a.ticker, a.nombre, a.moneda, al_guardar=self._pulsar_editar)
+            self, a.id_activo, a.ticker, a.nombre, al_guardar=self._pulsar_editar)
 
-    def _destino(self):
-        """Los mensajes van a la ventana emergente abierta; si no hay ninguna, al panel."""
+    def _padre_aviso(self):
+        """Los diálogos de aviso se abren sobre la ventana emergente abierta; si no hay, sobre el panel."""
         for dialogo in (self._dialogo_agregar, self._dialogo_editar):
             if self._vivo(dialogo):
-                return dialogo.mensaje
-        return self._mensaje
-
-    def mostrar_error(self, texto: str) -> None:
-        self._destino().mostrar_error(texto)
-
-    def mostrar_exito(self, texto: str) -> None:
-        self._destino().mostrar_exito(texto)
-
-    def limpiar_mensaje(self) -> None:
-        self._destino().limpiar()
+                return dialogo
+        return self
 
     # --------------------------------------------- lo que el controlador lee
     def valores(self) -> Dict[str, str]:
@@ -253,9 +243,9 @@ class ActivosAdminView(PanelView):
         if elegido is not None and fuente is not None and self._al_probar_fuente:
             self._al_probar_fuente(elegido.activo.ticker, elegido.activo.tipo.value, int(fuente))
 
-    def _pulsar_editar(self, id_activo: int, nombre: str, moneda: str) -> None:
+    def _pulsar_editar(self, id_activo: int, nombre: str) -> None:
         if self._al_editar:
-            self._al_editar(id_activo, nombre, moneda)
+            self._al_editar(id_activo, nombre)
 
     def _pulsar_agregar(self) -> None:
         if self._al_agregar:

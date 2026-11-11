@@ -1,4 +1,4 @@
-"""Mensaje para el usuario (error o confirmación).
+"""Mensaje de error de un campo o de un formulario.
 
 Mientras no hay texto NO ocupa espacio: la etiqueta se quita de la pantalla
 (pack_forget) y solo se vuelve a poner cuando hay algo que decir. Se envuelve en
@@ -6,6 +6,9 @@ un Frame para que, al volver a aparecer, quede en el mismo lugar y no al final.
 
 El texto usa TODO el ancho disponible: el salto de línea se recalcula cada vez que
 cambia el ancho del mensaje, así que sirve en cualquier pantalla.
+
+Solo se usa para errores de formulario (bajo su campo). Los avisos de las secciones del
+panel son diálogos (ver PanelView).
 """
 import ttkbootstrap as ttk
 
@@ -23,20 +26,14 @@ class StatusMessage(ttk.Frame):
         self.bind("<Configure>", self._ajustar_ancho)
 
     def mostrar_error(self, texto: str) -> None:
-        self._mostrar(texto, Colors.DANGER)
-
-    def mostrar_exito(self, texto: str) -> None:
-        self._mostrar(texto, Colors.SUCCESS)
-
-    def limpiar(self) -> None:
-        self._etiqueta.pack_forget()
-
-    def _mostrar(self, texto: str, color: str) -> None:
         if not texto:
             self.limpiar()
             return
-        self._etiqueta.configure(text=texto, bootstyle=color)
+        self._etiqueta.configure(text=texto, bootstyle=Colors.DANGER)
         self._etiqueta.pack(anchor="w", fill="x", pady=(Spacing.XS, 0))
+
+    def limpiar(self) -> None:
+        self._etiqueta.pack_forget()
 
     def _ajustar_ancho(self, evento) -> None:
         if evento.width > 1:
