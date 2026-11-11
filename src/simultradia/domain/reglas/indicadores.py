@@ -9,3 +9,5 @@ PERIODO_BOLLINGER = 20
 DESVIACIONES_BOLLINGER = 2.0
 PERIODO_RSI = 14
 MACD_RAPIDA, MACD_LENTA, MACD_SENAL = 12, 26, 9
+PERIODO_ATR = 14
+MULTIPLO_ATR_STOP = 2      # el stop sugerido queda a tantos ATR por debajo del precio de entrada

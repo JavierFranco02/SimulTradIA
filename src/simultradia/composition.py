@@ -55,5 +55,5 @@ def crear_servicios(db) -> Servicios:
         ingesta=IngestaService(db, activos, precios, fuentes, clientes),
         activo_admin=ActivoAdminService(db, activos, precios, fuentes, clientes),
         fuente_admin=FuenteAdminService(db, fuentes),
-        operar=OperarService(db, cuentas, PosicionRepository(), OrdenRepository(), activos),
+        operar=OperarService(db, cuentas, PosicionRepository(), OrdenRepository(), activos, precios),
     )

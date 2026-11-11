@@ -25,6 +25,7 @@ class _VistaOperar(VistaPanelFalsa):
 
     def activo_elegido(self): return self._id_activo
     def solicitud(self): return SolicitudOrden(self._lado, TipoOrden.MERCADO, self._cantidad)
+    def riesgo_escrito(self): return "1"
     def posicion_elegida(self): return self._posicion
     def orden_pendiente_elegida(self): return self._pendiente
     def confirmar_orden(self): return self._confirma_orden
@@ -39,13 +40,15 @@ class _VistaOperar(VistaPanelFalsa):
     def mostrar_historial(self, ordenes): self.eventos.append(("historial", ordenes))
     def mostrar_ejecucion(self, ejecucion): self.eventos.append(("ejecucion", ejecucion))
     def mostrar_pendiente(self, orden): self.eventos.append(("pendiente", orden))
+    def mostrar_stop_sugerido(self, sugerencia): self.eventos.append(("stop", sugerencia))
+    def mostrar_cantidad_por_riesgo(self, resultado): self.eventos.append(("cantidad_por_riesgo", resultado))
     def mostrar_errores_proteccion(self, errores): self.eventos.append(("errores_proteccion", dict(errores)))
     def limpiar_errores_proteccion(self): self.eventos.append(("limpiar_errores_proteccion", ()))
     def cerrar_proteccion(self): self.eventos.append(("cerrar_proteccion", ()))
 
 
 def _estado(resumen="RES"):
-    return EstadoOperar(resumen, ["P"], ["PEN"], ["H"])
+    return EstadoOperar(resumen, ["P"], ["PEN"], ["H"], D("10000"))
 
 
 class PruebasOperarController(unittest.TestCase):
@@ -62,7 +65,8 @@ class PruebasOperarController(unittest.TestCase):
         vista = vista or _VistaOperar()
         base = dict(obtener_estado=_estado(), estimar="EST", cantidad_para=D("0.5"),
                     enviar=ResultadoOrden(ejecucion="EJEC"), vender_todo="EJEC", cancelar_orden=None,
-                    editar_proteccion=None, cerrar_todas=ResultadoCierre(2, []))
+                    editar_proteccion=None, cerrar_todas=ResultadoCierre(2, []), sugerir_stop="STOP",
+                    cantidad_por_riesgo="CALCULO")
         base.update(respuestas)
         operar = ServicioGenerico(**base)
         mercado = ServicioGenerico(obtener_panel=PanelMercado(items=["A"]))
@@ -278,6 +282,48 @@ class PruebasOperarController(unittest.TestCase):
         vista, _, _ = self._cargado(editar_proteccion=ErrorOperacionInvalida("No tienes este activo."))
         vista.acciones["al_guardar_proteccion"](1, "90", "")
         self.assertEqual(vista.error, "No tienes este activo.")
+
+    # ------------------------------------------------------ calculadora de riesgo
+    def test_sugerir_stop_pide_el_stop_y_lo_muestra(self):
+        vista, operar, _ = self._cargado()
+        vista.acciones["al_sugerir_stop"]()
+        llamada = operar.llamadas[0]
+        self.assertEqual((llamada[0], llamada[1], llamada[2]), ("sugerir_stop", self.ana, 1))
+        self.assertEqual(vista.ultimo("stop"), "STOP")
+
+    def test_un_error_al_sugerir_el_stop_se_muestra(self):
+        vista, _, _ = self._cargado(sugerir_stop=ErrorOperacionInvalida("Sin velas suficientes."))
+        vista.acciones["al_sugerir_stop"]()
+        self.assertEqual(vista.error, "Sin velas suficientes.")
+        self.assertIsNone(vista.ultimo("stop"))
+
+    def test_sugerir_stop_sin_activo_elegido_no_hace_nada(self):
+        vista, operar, _ = self._cargado(_VistaOperar(id_activo=None))
+        vista.acciones["al_sugerir_stop"]()
+        self.assertEqual(operar.llamadas, [])
+
+    def test_calcular_la_cantidad_usa_el_riesgo_escrito_y_el_patrimonio(self):
+        vista, operar, _ = self._cargado()
+        vista.acciones["al_calcular_cantidad"]()
+        llamada = operar.llamadas[0]
+        self.assertEqual((llamada[0], llamada[1], llamada[3], llamada[4]), ("cantidad_por_riesgo", "RES", "1", D("10000")))
+        self.assertEqual(vista.ultimo("cantidad_por_riesgo"), "CALCULO")
+
+    def test_un_error_al_calcular_la_cantidad_se_muestra(self):
+        vista, _, _ = self._cargado(cantidad_por_riesgo=DatosInvalidos({"stop_loss": "Pon primero un stop-loss."}))
+        vista.acciones["al_calcular_cantidad"]()
+        self.assertEqual(vista.error, "Pon primero un stop-loss.")
+        self.assertIsNone(vista.ultimo("cantidad_por_riesgo"))
+
+    def test_calcular_espera_a_tener_datos_del_activo(self):
+        vista, operar, _ = self._crear()
+        vista.acciones["al_calcular_cantidad"]()
+        self.assertEqual([c for c in operar.llamadas if c[0] == "cantidad_por_riesgo"], [])
+
+    def test_la_estimacion_recibe_el_patrimonio(self):
+        vista, operar, _ = self._cargado()
+        vista.acciones["al_cambiar_orden"]()
+        self.assertEqual(operar.llamadas[-1][3], D("10000"))
 
     # ------------------------------------------------------------ respuestas tardías
     def test_un_estado_viejo_se_descarta(self):

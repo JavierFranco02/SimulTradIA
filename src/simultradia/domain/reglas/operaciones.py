@@ -113,6 +113,8 @@ class Estimacion:
     total: Decimal                   # compra: lo que se paga (monto + comisión); venta: lo que se recibe
     saldo_despues: Decimal
     ganancia: Optional[Decimal]      # solo en ventas: ganancia realizada, ya sin comisiones
+    riesgo: Optional[Decimal] = None        # solo en compras con stop-loss: lo que se pierde si el precio llega a él
+    riesgo_pct: Optional[Decimal] = None    # ese riesgo como % del patrimonio (si se conoce)
 
 
 def estimar_orden(lado: LadoOrden, cantidad: Decimal, precio_mercado: Decimal, saldo: Decimal,
@@ -154,3 +156,29 @@ def proteccion_alcanzada(stop_loss: Optional[Decimal], take_profit: Optional[Dec
     if take_profit is not None and precio >= take_profit:
         return TipoOrden.TAKE_PROFIT
     return None
+
+
+def riesgo_por_unidad(entrada: Decimal, stop: Decimal, comision_pct: Decimal) -> Decimal:
+    """Lo que se pierde por cada unidad si el precio cae de `entrada` hasta `stop`: la caída más las comisiones
+    de comprar y de vender (no cuenta el deslizamiento que pudiera haber al saltar el stop)."""
+    return (entrada - stop) + (entrada + stop) * comision_pct / _CIEN
+
+
+def riesgo_de_orden(cantidad: Decimal, entrada: Decimal, stop: Decimal, comision_pct: Decimal) -> Decimal:
+    return redondear_dinero(cantidad * riesgo_por_unidad(entrada, stop, comision_pct))
+
+
+def calcular_cantidad_por_riesgo(riesgo_dinero: Decimal, entrada: Decimal, stop: Decimal,
+                                 comision_pct: Decimal) -> Decimal:
+    """Cuántas unidades comprar para que, si el precio cae hasta `stop`, se pierda como mucho `riesgo_dinero`."""
+    por_unidad = riesgo_por_unidad(entrada, stop, comision_pct)
+    if por_unidad <= 0:
+        return Decimal(0)
+    return min(riesgo_dinero / por_unidad, _TOPE_CANTIDAD).quantize(_CANTIDAD, rounding=ROUND_DOWN)
+
+
+def redondear_nivel(valor: Decimal) -> Decimal:
+    """Redondea un nivel de precio sugerido (stop-loss...) con los mismos decimales con que se muestran los
+    precios: 2 si vale 100 o más, 4 si vale 1 o más, 6 si menos."""
+    decimales = 2 if valor >= 100 else 4 if valor >= 1 else 6
+    return valor.quantize(Decimal(1).scaleb(-decimales), rounding=ROUND_HALF_UP)

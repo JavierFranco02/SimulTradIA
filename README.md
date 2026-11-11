@@ -1,7 +1,8 @@
 # SimulTradIA
 
 Aplicación de escritorio (Python + ttkbootstrap + PostgreSQL). Incluye login, registro, el panel principal (shell),
-**Mercado** (lista de activos y gráfico de velas con indicadores, en un panel dividido) y el panel de
+**Mercado** (lista de activos y gráfico de velas con indicadores, en un panel dividido), **Operar** (comprar y vender
+con dinero virtual: órdenes a mercado y límite, stop-loss, take-profit y calculadora de riesgo) y el panel de
 **administración** (usuarios, activos con su fuente de datos, e ingesta). Hay 30 activos: 5 criptomonedas
 (Binance) y 25 acciones, ETF, divisas, índices y bonos (Yahoo Finance).
 
@@ -31,12 +32,20 @@ Aplicación de escritorio (Python + ttkbootstrap + PostgreSQL). Incluye login, r
    ```
    (Si ya habías ejecutado la versión anterior de `mercado.sql`, solo con criptomonedas, ejecuta en cambio
    `database/mercado_actualizar.sql`; después puedes borrar ese archivo.)
+   Para Operar, crea sus tablas (`ordenes`, `ejecuciones`, `posiciones`, `operaciones_cerradas`) y, después, las columnas
+   de las órdenes límite y del stop-loss / take-profit:
+   ```
+   psql -d simulador_trading -v ON_ERROR_STOP=1 -f database/operar.sql
+   psql -d simulador_trading -v ON_ERROR_STOP=1 -f database/operar_fase2.sql
+   ```
+   (`operar_fase2.sql` se ejecuta una sola vez y después puedes borrarlo.)
 3. Copia `.env.example` como `.env` y completa los datos de tu PostgreSQL.
 4. Crea tu cuenta de administrador (una sola vez):
    ```
    python scripts/crear_admin.py
    ```
-5. En una terminal, deja corriendo el proceso que mantiene los precios al día (la primera vez descarga el historial y tarda unos minutos):
+5. En una terminal, deja corriendo el proceso que mantiene los precios al día y ejecuta las órdenes pendientes
+   (la primera vez descarga el historial y tarda unos minutos):
    ```
    python worker.py
    ```
@@ -58,5 +67,9 @@ python -m unittest discover -s tests -t . -v
 - **Menú lateral del panel:** `src/simultradia/iu/shell/pantallas.py`
 - **Qué intervalos de vela se guardan y cuánta historia:** `src/simultradia/domain/reglas/intervalos.py`
 - **Cada cuánto actualiza el worker precios y velas:** `worker.py` (la pasada) y, por fuente, `segundos_entre_cotizaciones` y `segundos_entre_velas` en `clients/binance_client.py` y `clients/yahoo_client.py`
-- **Parámetros de los indicadores (SMA, EMA, Bollinger, RSI, MACD):** `src/simultradia/domain/reglas/indicadores.py`
+- **Parámetros de los indicadores (SMA, EMA, Bollinger, RSI, MACD, ATR y el múltiplo del stop sugerido):** `src/simultradia/domain/reglas/indicadores.py`
+- **Reglas de operar (comisión, deslizamiento, ganancia, riesgo, cuándo se dispara una orden):** `src/simultradia/domain/reglas/operaciones.py`
+- **Comisión y deslizamiento de una cuenta:** columnas `comision_pct` y `deslizamiento_pct` de `cuentas_simuladas`
+  (por ejemplo, `UPDATE cuentas_simuladas SET deslizamiento_pct = 0.05;`)
+- **Capital inicial de las cuentas nuevas:** `_cuenta_inicial` en `src/simultradia/services/usuario_service.py`
 - **Sumar una fuente de datos nueva:** su cliente en `clients/`, registrado en `composition.py`, y una fila en `fuentes_datos`

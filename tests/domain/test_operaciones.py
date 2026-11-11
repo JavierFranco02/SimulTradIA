@@ -6,8 +6,9 @@ from decimal import Decimal as D
 from simultradia.domain.entities.posicion_entity import Posicion
 from simultradia.domain.enums import LadoOrden, TipoOrden
 from simultradia.domain.reglas.operaciones import (
-    aplicar_compra, aplicar_venta, calcular_compra, cantidad_maxima_compra, estimar_orden, limite_alcanzado,
-    precio_de_ejecucion, proteccion_alcanzada, valorar_posicion)
+    aplicar_compra, aplicar_venta, calcular_cantidad_por_riesgo, calcular_compra, cantidad_maxima_compra,
+    estimar_orden, limite_alcanzado, precio_de_ejecucion, proteccion_alcanzada, redondear_nivel, riesgo_de_orden,
+    riesgo_por_unidad, valorar_posicion)
 
 AHORA = datetime(2026, 10, 25, 12, 0, tzinfo=timezone.utc)
 
@@ -96,6 +97,30 @@ class PruebasValoracion(unittest.TestCase):
         p = Posicion(1, 1, D("2"), D("100"))
         self.assertEqual(valorar_posicion(p, D("110")), (D("220"), D("20"), D("10")))
         self.assertEqual(valorar_posicion(p, D("90")), (D("180"), D("-20"), D("-10")))
+
+
+class PruebasRiesgo(unittest.TestCase):
+    def test_riesgo_por_unidad_suma_la_caida_y_las_comisiones(self):
+        self.assertEqual(riesgo_por_unidad(D("100"), D("90"), D("0")), D("10"))
+        self.assertEqual(riesgo_por_unidad(D("100"), D("90"), D("0.1")), D("10.19"))
+
+    def test_riesgo_de_una_orden(self):
+        self.assertEqual(riesgo_de_orden(D("10"), D("100"), D("90"), D("0.1")), D("101.9"))
+
+    def test_cantidad_para_arriesgar_un_monto(self):
+        self.assertEqual(calcular_cantidad_por_riesgo(D("100"), D("100"), D("90"), D("0")), D("10"))
+        q = calcular_cantidad_por_riesgo(D("100"), D("100"), D("90"), D("0.1"))
+        self.assertTrue(D("9.81") < q < D("9.82"))
+        self.assertLessEqual(riesgo_de_orden(q, D("100"), D("90"), D("0.1")), D("100"))
+
+    def test_sin_distancia_al_stop_no_hay_cantidad(self):
+        self.assertEqual(calcular_cantidad_por_riesgo(D("100"), D("100"), D("100"), D("0")), D("0"))
+        self.assertEqual(calcular_cantidad_por_riesgo(D("100"), D("100"), D("120"), D("0")), D("0"))
+
+    def test_niveles_con_los_decimales_con_que_se_muestran_los_precios(self):
+        self.assertEqual(redondear_nivel(D("1234.5678")), D("1234.57"))
+        self.assertEqual(redondear_nivel(D("12.34567")), D("12.3457"))
+        self.assertEqual(redondear_nivel(D("0.1234567")), D("0.123457"))
 
 
 class PruebasDisparadores(unittest.TestCase):

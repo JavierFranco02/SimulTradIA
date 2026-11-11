@@ -4,7 +4,8 @@ y, debajo, en pestañas: posiciones abiertas, órdenes pendientes e historial de
 Vista pasiva: OperarController le dice qué mostrar y recibe lo que el usuario pulsa. El gráfico es
 el mismo de Mercado (`GraficoActivoView`) y lo maneja su propio GraficoController.
 Los bordes entre las zonas se arrastran con el mouse; al abrir, el gráfico se lleva casi dos tercios del alto.
-El ticket tiene dos tarjetas (la de la cuenta y el resumen de la orden) y se desplaza si no cabe en el alto.
+El ticket tiene tres tarjetas (la de la cuenta, la calculadora de riesgo y el resumen de la orden) y se desplaza
+si no cabe en el alto.
 """
 import tkinter as tk
 from decimal import Decimal
@@ -16,6 +17,7 @@ import ttkbootstrap as ttk
 from simultradia.domain.entities.cotizacion_entity import ActivoCotizado
 from simultradia.domain.entities.orden_entity import Ejecucion, Orden
 from simultradia.domain.enums import EstadoOrden, LadoOrden, TipoOrden
+from simultradia.domain.reglas import indicadores as cfg
 from simultradia.domain.reglas.operaciones import Estimacion
 from simultradia.iu.base.panel_view import PanelView
 from simultradia.iu.components import ActionButton, Card, DataTable, ScrollFrame, SelectField
@@ -23,7 +25,8 @@ from simultradia.iu.formato import dinero, fecha_hora, porcentaje, precio, unida
 from simultradia.iu.mercado.grafico_view import GraficoActivoView
 from simultradia.iu.operar.proteccion_dialog import EditarProteccionDialog
 from simultradia.iu.styles import ButtonStyle, Colors, Fonts, Palette, Spacing
-from simultradia.services.operar_service import PosicionValorada, ResumenOperar, SolicitudOrden
+from simultradia.services.operar_service import (
+    CantidadPorRiesgo, PosicionValorada, ResumenOperar, SolicitudOrden, SugerenciaStop)
 
 _TIPO = {TipoOrden.MERCADO: "Mercado", TipoOrden.LIMITE: "Límite", TipoOrden.STOP_LOSS: "Stop-loss",
          TipoOrden.TAKE_PROFIT: "Take-profit", TipoOrden.STOP_LIMITE: "Stop-límite"}
@@ -82,6 +85,8 @@ class OperarView(PanelView):
         self._al_cerrar_todas: Optional[Callable[[], None]] = None
         self._al_guardar_proteccion: Optional[Callable[[int, str, str], None]] = None
         self._al_cancelar_orden: Optional[Callable[[], None]] = None
+        self._al_sugerir_stop: Optional[Callable[[], None]] = None
+        self._al_calcular_cantidad: Optional[Callable[[], None]] = None
         self._tickers: Dict[str, str] = {}              # id del activo -> ticker
         self._posiciones: Dict[str, PosicionValorada] = {}
         self._pendientes: Dict[str, Orden] = {}
@@ -196,6 +201,28 @@ class OperarView(PanelView):
         marco, self._take_profit, self._entrada_take_profit = self._campo(niveles, "Take-profit")
         marco.grid(row=0, column=1, sticky="ew", padx=(Spacing.XS, 0))
 
+        # --- tarjeta de la calculadora de riesgo: cuántas unidades comprar para arriesgar un % del capital
+        calculadora = Card(t)
+        calculadora.pack(fill="x", pady=(Spacing.MD, 0))
+        k = calculadora.cuerpo
+        self._rotulo(k, "Calculadora de riesgo").pack(anchor="w")
+        fila = ttk.Frame(k)
+        fila.pack(fill="x", pady=(Spacing.SM, 0))
+        ttk.Label(fila, text="Arriesgar (% del capital)", font=Fonts.BODY,
+                  foreground=Palette.TEXTO).pack(side="left")
+        self._riesgo = tk.StringVar(master=self, value="1")
+        self._entrada_riesgo = ttk.Entry(fila, textvariable=self._riesgo, width=6, font=Fonts.BODY)
+        self._entrada_riesgo.pack(side="right")
+        self._boton_stop = ActionButton(k, "Sugerir stop (%d×ATR)" % cfg.MULTIPLO_ATR_STOP,
+                                        self._pulsar_sugerir_stop, estilo=ButtonStyle.LIGHT_OUTLINE)
+        self._boton_stop.pack(fill="x", pady=(Spacing.SM, 0))
+        self._boton_calcular = ActionButton(k, "Calcular cantidad", self._pulsar_calcular_cantidad,
+                                            estilo=ButtonStyle.LIGHT_OUTLINE)
+        self._boton_calcular.pack(fill="x", pady=(Spacing.XS, 0))
+        self._nota_riesgo = ttk.Label(k, text="", font=Fonts.SMALL, foreground=Palette.TEXTO,
+                                      wraplength=_ANCHO_TICKET - 60, justify="left")
+        self._nota_riesgo.pack(anchor="w", pady=(Spacing.XS, 0))
+
         # --- tarjeta con el resumen de la orden: etiquetas a la izquierda, valores a la derecha
         resumen = Card(t)
         resumen.pack(fill="x", pady=(Spacing.MD, 0))
@@ -205,7 +232,7 @@ class OperarView(PanelView):
         fila = 0
         for clave, titulo in (("precio", "Precio de ejecución"), ("monto", "Monto"), ("comision", "Comisión"),
                               ("separador", None), ("total", "Total"), ("saldo", "Saldo después"),
-                              ("ganancia", "Ganancia estimada")):
+                              ("riesgo", "Riesgo hasta el stop"), ("ganancia", "Ganancia estimada")):
             if clave == "separador":
                 ttk.Separator(r).grid(row=fila, column=0, columnspan=2, sticky="ew", pady=Spacing.SM)
             else:
@@ -268,7 +295,8 @@ class OperarView(PanelView):
                           al_porcentaje: Callable[[int], None], al_enviar: Callable[[], None],
                           al_cerrar_posicion: Callable[[], None], al_cerrar_todas: Callable[[], None],
                           al_guardar_proteccion: Callable[[int, str, str], None],
-                          al_cancelar_orden: Callable[[], None]) -> None:
+                          al_cancelar_orden: Callable[[], None], al_sugerir_stop: Callable[[], None],
+                          al_calcular_cantidad: Callable[[], None]) -> None:
         self._al_elegir_activo = al_elegir_activo
         self._al_cambiar_orden = al_cambiar_orden
         self._al_porcentaje = al_porcentaje
@@ -277,6 +305,8 @@ class OperarView(PanelView):
         self._al_cerrar_todas = al_cerrar_todas
         self._al_guardar_proteccion = al_guardar_proteccion
         self._al_cancelar_orden = al_cancelar_orden
+        self._al_sugerir_stop = al_sugerir_stop
+        self._al_calcular_cantidad = al_calcular_cantidad
 
     # --------------------------------------------- lo que el controlador lee
     def activo_elegido(self) -> Optional[int]:
@@ -296,6 +326,9 @@ class OperarView(PanelView):
             precio_limite=self._limite.get() if tipo == TipoOrden.LIMITE else "",
             stop_loss=self._stop_loss.get() if compra else "",
             take_profit=self._take_profit.get() if compra else "")
+
+    def riesgo_escrito(self) -> str:
+        return self._riesgo.get()
 
     def posicion_elegida(self) -> Optional[int]:
         """El id del activo de la posición elegida en la tabla."""
@@ -379,6 +412,9 @@ class OperarView(PanelView):
         self._est["comision"].configure(text=dinero(e.comision, self._moneda))
         self._est["total"].configure(text=dinero(e.total, self._moneda))
         self._est["saldo"].configure(text=dinero(e.saldo_despues, self._moneda))
+        self._est["riesgo"].configure(
+            text="—" if e.riesgo is None else dinero(e.riesgo, self._moneda) + (
+                "" if e.riesgo_pct is None else " (%s)" % porcentaje(e.riesgo_pct)))
         self._est["ganancia"].configure(
             text="—" if e.ganancia is None else dinero(e.ganancia, self._moneda, con_signo=True))
 
@@ -428,6 +464,19 @@ class OperarView(PanelView):
              "alza" if o.lado == LadoOrden.COMPRA else "baja")
             for o in ordenes
         ])
+
+    def mostrar_stop_sugerido(self, s: SugerenciaStop) -> None:
+        """Pone el stop-loss sugerido en su caja y explica de dónde sale."""
+        self._stop_loss.set(unidades(s.stop_loss))
+        self._nota_riesgo.configure(text="ATR diario %s · stop a %d×ATR de %s" % (
+            precio(s.atr), cfg.MULTIPLO_ATR_STOP, precio(s.referencia)))
+
+    def mostrar_cantidad_por_riesgo(self, c: CantidadPorRiesgo) -> None:
+        """Pone la cantidad calculada y deja a la vista cuánto se arriesga con ella."""
+        self.establecer_cantidad(c.cantidad)
+        self._nota_riesgo.configure(text="Si el precio llega al stop pierdes unos %s (%s del capital)%s" % (
+            dinero(c.riesgo, self._moneda), porcentaje(c.riesgo_pct),
+            ". Limitada por tu saldo: con él no alcanza para arriesgar todo lo pedido." if c.limitada_por_saldo else "."))
 
     def mostrar_ejecucion(self, e: Ejecucion) -> None:
         """Confirma la operación hecha y deja el ticket listo para otra."""
@@ -503,8 +552,10 @@ class OperarView(PanelView):
         limite = self._tipo.obtener() == TipoOrden.LIMITE.value
         compra = self.lado() == LadoOrden.COMPRA
         self._entrada_limite.configure(state="normal" if limite else "disabled")
-        for entrada in (self._entrada_stop_loss, self._entrada_take_profit):
+        for entrada in (self._entrada_stop_loss, self._entrada_take_profit, self._entrada_riesgo):
             entrada.configure(state="normal" if compra else "disabled")
+        for boton in (self._boton_stop, self._boton_calcular):    # la calculadora es para compras
+            boton.configure(state="normal" if compra else "disabled")
         self._est_titulos["precio"].configure(text="Precio límite" if limite else "Precio de ejecución")
 
     def _fijar_reparto(self) -> None:
@@ -527,6 +578,7 @@ class OperarView(PanelView):
 
     # --------------------------------------------------------- eventos de la UI
     def _pulsar_activo(self) -> None:
+        self._nota_riesgo.configure(text="")
         if self._al_elegir_activo:
             self._al_elegir_activo()
 
@@ -558,6 +610,14 @@ class OperarView(PanelView):
     def _pulsar_cerrar_todas(self) -> None:
         if self._al_cerrar_todas:
             self._al_cerrar_todas()
+
+    def _pulsar_sugerir_stop(self) -> None:
+        if self._al_sugerir_stop:
+            self._al_sugerir_stop()
+
+    def _pulsar_calcular_cantidad(self) -> None:
+        if self._al_calcular_cantidad:
+            self._al_calcular_cantidad()
 
     def _pulsar_cancelar(self) -> None:
         if self._al_cancelar_orden:

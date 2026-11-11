@@ -1,4 +1,5 @@
-"""Casos de uso de Operar: órdenes a mercado y límite, stop-loss / take-profit, posiciones e historial.
+"""Casos de uso de Operar: órdenes a mercado y límite, stop-loss / take-profit, calculadora de riesgo,
+posiciones e historial.
 
 - Orden a MERCADO: se ejecuta en el acto contra la cotización guardada (cotizaciones_actuales), dentro de
   UNA transacción que bloquea la cuenta: si algo falla, no queda nada a medias.
@@ -8,7 +9,11 @@
 - STOP-LOSS / TAKE-PROFIT: son niveles de la POSICIÓN (no órdenes aparte). Cuando el precio los toca, el worker
   vende toda la posición. Se ponen al comprar o con `editar_proteccion`; si la posición se cierra, desaparecen.
 
-`estimar` y `cantidad_para` no tocan la base: trabajan con el `ResumenOperar` ya leído, para que la pantalla
+- CALCULADORA DE RIESGO (solo compras): `sugerir_stop` propone un stop-loss a 2 ATR (rango verdadero promedio de las
+  velas diarias) del precio de entrada, y `cantidad_por_riesgo` calcula cuántas unidades comprar para que, si el
+  precio llega a ese stop, se pierda como mucho un % del patrimonio.
+
+`estimar`, `cantidad_para` y `cantidad_por_riesgo` no tocan la base: trabajan con el `ResumenOperar` ya leído, para que la pantalla
 pueda mostrar el costo mientras el usuario escribe. El precio ya lo dejó el worker en la base: aquí no se llama
 a ninguna API externa.
 
@@ -21,16 +26,19 @@ from datetime import datetime, timezone
 from decimal import ROUND_DOWN, Decimal, InvalidOperation
 from typing import Callable, Dict, List, NamedTuple, Optional, Tuple
 
+from simultradia.analisis.indicadores import atr
 from simultradia.core.exceptions import DatosInvalidos, ErrorAplicacion, ErrorOperacionInvalida
 from simultradia.domain.entities.cotizacion_entity import ActivoCotizado
 from simultradia.domain.entities.cuenta_simulada_entity import CuentaSimulada
 from simultradia.domain.entities.orden_entity import Ejecucion, Orden
 from simultradia.domain.entities.posicion_entity import Posicion
 from simultradia.domain.entities.usuario_entity import Usuario
-from simultradia.domain.enums import EstadoOrden, LadoOrden, TipoOrden
+from simultradia.domain.enums import EstadoOrden, IntervaloVela, LadoOrden, TipoOrden
+from simultradia.domain.reglas import indicadores as cfg
 from simultradia.domain.reglas.operaciones import (
-    Estimacion, aplicar_compra, aplicar_venta, cantidad_maxima_compra, estimar_orden, limite_alcanzado,
-    precio_de_ejecucion, proteccion_alcanzada, valorar_posicion)
+    Estimacion, aplicar_compra, aplicar_venta, calcular_cantidad_por_riesgo, cantidad_maxima_compra, estimar_orden,
+    limite_alcanzado, precio_de_ejecucion, proteccion_alcanzada, redondear_dinero, redondear_nivel, riesgo_de_orden,
+    valorar_posicion)
 from simultradia.services.permisos import exigir_operador
 from simultradia.services.validacion import lanzar_si_hay_errores
 
@@ -39,6 +47,7 @@ _DECIMALES_CANTIDAD = Decimal(1).scaleb(-10)    # la base guarda 10 decimales de
 _DECIMALES_PRECIO = Decimal(1).scaleb(-8)       # ...y 8 de precio
 _CANTIDAD_MAXIMA = Decimal(10) ** 12
 _LIMITE_HISTORIAL = 50
+_VELAS_PARA_ATR = 100       # velas diarias que se leen: de sobra para que el suavizado del ATR se asiente
 
 
 def _ahora_utc() -> datetime:
@@ -95,6 +104,22 @@ class EstadoOperar:
     posiciones: List[PosicionValorada]
     pendientes: List[Orden]
     historial: List[Orden]
+    patrimonio: Optional[Decimal] = None    # saldo + valor de las posiciones (base del "% del capital" de la calculadora)
+
+
+@dataclass(frozen=True)
+class SugerenciaStop:
+    stop_loss: Decimal
+    atr: Decimal                        # ATR diario del activo
+    referencia: Decimal                 # precio de entrada con el que se calculó
+
+
+@dataclass(frozen=True)
+class CantidadPorRiesgo:
+    cantidad: Decimal
+    riesgo: Decimal                     # lo que se perdería si el precio llega al stop
+    riesgo_pct: Decimal                 # el % del patrimonio que se pidió arriesgar
+    limitada_por_saldo: bool            # True si el saldo no alcanza para comprar lo que pedía el riesgo
 
 
 @dataclass(frozen=True)
@@ -119,12 +144,13 @@ class _Preparada(NamedTuple):
 
 class OperarService:
     def __init__(self, db, cuenta_repository, posicion_repository, orden_repository, activo_repository,
-                 reloj: Callable[[], datetime] = _ahora_utc):
+                 precio_repository, reloj: Callable[[], datetime] = _ahora_utc):
         self._db = db
         self._cuentas = cuenta_repository
         self._posiciones = posicion_repository
         self._ordenes = orden_repository
         self._activos = activo_repository
+        self._precios = precio_repository
         self._reloj = reloj
 
     # ------------------------------------------------------------- consultas
@@ -140,7 +166,11 @@ class OperarService:
             posiciones = self._leer_posiciones(conn, cuenta)
             pendientes = self._ordenes.listar_pendientes(conn, cuenta.id_cuenta)
             historial = self._ordenes.listar_ordenes(conn, cuenta.id_cuenta, _LIMITE_HISTORIAL)
-        return EstadoOperar(resumen, posiciones, pendientes, historial)
+        # Los que no tienen precio se valoran a lo que costaron.
+        patrimonio = redondear_dinero(cuenta.saldo_disponible + sum(
+            (v.valor if v.valor is not None else v.posicion.cantidad * v.posicion.precio_promedio_entrada
+             for v in posiciones), Decimal(0)))
+        return EstadoOperar(resumen, posiciones, pendientes, historial, patrimonio)
 
     def obtener_resumen(self, actor: Usuario, id_activo: int) -> ResumenOperar:
         exigir_operador(actor)
@@ -161,9 +191,11 @@ class OperarService:
             return self._ordenes.listar_ordenes(conn, cuenta.id_cuenta, limite)
 
     # ------------------------------------------- cálculos para la pantalla (sin BD)
-    def estimar(self, resumen: ResumenOperar, solicitud: SolicitudOrden) -> Estimacion:
-        """Lo que costaría o dejaría la orden. Lanza el mismo error que daría al enviarla."""
-        return self._preparar(resumen.item, resumen, resumen.posicion, solicitud, self._reloj()).estimacion
+    def estimar(self, resumen: ResumenOperar, solicitud: SolicitudOrden,
+                patrimonio: Optional[Decimal] = None) -> Estimacion:
+        """Lo que costaría o dejaría la orden (y, si trae stop-loss, cuánto se arriesga). Lanza el mismo error que
+        daría al enviarla. `patrimonio` solo sirve para expresar el riesgo como % del capital."""
+        return self._preparar(resumen.item, resumen, resumen.posicion, solicitud, self._reloj(), patrimonio).estimacion
 
     def cantidad_para(self, resumen: ResumenOperar, solicitud: SolicitudOrden, porcentaje: int) -> Decimal:
         """El `porcentaje` (1 a 100) de lo máximo que se puede comprar con el saldo, o de lo que se tiene al vender.
@@ -181,6 +213,48 @@ class OperarService:
         if cantidad <= 0:
             raise ErrorOperacionInvalida(vacio)
         return cantidad
+
+    def cantidad_por_riesgo(self, resumen: ResumenOperar, solicitud: SolicitudOrden, riesgo_texto: str,
+                            patrimonio: Optional[Decimal] = None) -> CantidadPorRiesgo:
+        """Cuántas unidades comprar para arriesgar `riesgo_texto` % del patrimonio (o del saldo si no se conoce)
+        hasta el stop-loss escrito en la solicitud. Si el saldo no alcanza, se compra lo que alcance."""
+        entrada, stop = self._entrada_y_stop(resumen.item, resumen, solicitud)
+        riesgo_pct = self._leer_riesgo(riesgo_texto)
+        base = patrimonio if patrimonio else resumen.saldo_disponible
+        cantidad = calcular_cantidad_por_riesgo(base * riesgo_pct / 100, entrada, stop, resumen.comision_pct)
+        maxima = cantidad_maxima_compra(resumen.saldo_disponible, entrada, resumen.comision_pct)
+        if maxima <= 0:
+            raise ErrorOperacionInvalida("No tienes saldo suficiente para comprar.")
+        limitada = cantidad > maxima
+        cantidad = min(cantidad, maxima)
+        if cantidad <= 0:
+            raise ErrorOperacionInvalida("Con ese riesgo y ese stop no alcanza ni para la cantidad mínima.")
+        return CantidadPorRiesgo(cantidad, riesgo_de_orden(cantidad, entrada, stop, resumen.comision_pct),
+                                 riesgo_pct, limitada)
+
+    def sugerir_stop(self, actor: Usuario, id_activo: int, solicitud: SolicitudOrden) -> SugerenciaStop:
+        """Un stop-loss a 2 ATR por debajo del precio de entrada (el límite escrito, o el de mercado).
+        El ATR sale de las velas diarias del activo."""
+        exigir_operador(actor)
+        if solicitud.lado != LadoOrden.COMPRA:
+            raise ErrorOperacionInvalida("La calculadora de riesgo es para compras.")
+        with self._db.obtener_conexion() as conn:
+            cuenta = self._cuenta_de(conn, actor)
+            item = self._buscar_activo(conn, id_activo)
+            velas = self._precios.buscar_velas(conn, id_activo, IntervaloVela.D1, _VELAS_PARA_ATR)
+        self._exigir_operable(item, cuenta.moneda)
+        entrada = self._limite_si_es_valido(solicitud) or precio_de_ejecucion(
+            item.cotizacion.precio, LadoOrden.COMPRA, cuenta.deslizamiento_pct)
+        serie = atr([float(v.maximo) for v in velas], [float(v.minimo) for v in velas],
+                    [float(v.cierre) for v in velas], cfg.PERIODO_ATR)
+        if not serie or serie[-1] is None:
+            raise ErrorOperacionInvalida("Este activo no tiene suficientes velas diarias para calcular el ATR.")
+        valor_atr = Decimal(str(serie[-1]))
+        stop = redondear_nivel(entrada - cfg.MULTIPLO_ATR_STOP * valor_atr)
+        if stop <= 0:
+            raise ErrorOperacionInvalida("El ATR de este activo es tan grande que %d ATR bajo el precio sería "
+                                         "negativo: pon el stop-loss a mano." % cfg.MULTIPLO_ATR_STOP)
+        return SugerenciaStop(stop, redondear_nivel(valor_atr), entrada)
 
     # ---------------------------------------------------------------- órdenes
     def enviar(self, actor: Usuario, id_activo: int, solicitud: SolicitudOrden) -> ResultadoOrden:
@@ -351,7 +425,7 @@ class OperarService:
         return self._registrar(conn, cuenta, item, lado, tipo, cantidad, estimacion, ahora, id_orden)
 
     def _preparar(self, item: ActivoCotizado, cuenta, posicion: Optional[Posicion], s: SolicitudOrden,
-                  ahora: datetime) -> _Preparada:
+                  ahora: datetime, patrimonio: Optional[Decimal] = None) -> _Preparada:
         """Valida lo escrito en el ticket y calcula la orden. `cuenta` es la cuenta o el resumen: ambos traen
         saldo_disponible, moneda, comision_pct y deslizamiento_pct."""
         cantidad = self._leer_cantidad(s.cantidad)
@@ -369,6 +443,10 @@ class OperarService:
                                    precio_base=limite if limite is not None else mercado,
                                    deslizamiento=Decimal(0) if limite is not None else cuenta.deslizamiento_pct)
         stop_loss, take_profit = self._leer_niveles(s, estimacion.precio)
+        if stop_loss is not None:
+            riesgo = riesgo_de_orden(cantidad, estimacion.precio, stop_loss, cuenta.comision_pct)
+            riesgo_pct = (riesgo / patrimonio * 100).quantize(Decimal("0.0001")) if patrimonio else None
+            estimacion = replace(estimacion, riesgo=riesgo, riesgo_pct=riesgo_pct)
         return _Preparada(cantidad, limite, stop_loss, take_profit, estimacion)
 
     def _estimar(self, item: ActivoCotizado, cuenta, posicion: Optional[Posicion], lado: LadoOrden,
@@ -473,6 +551,32 @@ class OperarService:
             raise ErrorOperacionInvalida(
                 "%s cotiza en %s y tu cuenta está en %s: todavía no se puede operar con cambio de moneda."
                 % (item.activo.ticker, item.activo.moneda, moneda_cuenta))
+
+    def _entrada_y_stop(self, item: ActivoCotizado, cuenta, s: SolicitudOrden) -> Tuple[Decimal, Decimal]:
+        """El precio de entrada y el stop-loss escrito, ya validados, para la calculadora de riesgo."""
+        if s.lado != LadoOrden.COMPRA:
+            raise ErrorOperacionInvalida("La calculadora de riesgo es para compras.")
+        self._exigir_operable(item, cuenta.moneda)
+        limite = self._leer_limite(s)
+        entrada = limite if limite is not None else precio_de_ejecucion(
+            item.cotizacion.precio, LadoOrden.COMPRA, cuenta.deslizamiento_pct)
+        stop = self._a_decimal(s.stop_loss, "stop_loss", "stop-loss")
+        if stop is None:
+            raise DatosInvalidos({"stop_loss": "Pon primero un stop-loss, o usa «Sugerir stop»."})
+        if stop >= entrada:
+            raise DatosInvalidos({"stop_loss": "El stop-loss debe estar por debajo del precio de compra."})
+        return entrada, stop
+
+    @classmethod
+    def _leer_riesgo(cls, texto: str) -> Decimal:
+        """El % del capital a arriesgar: mayor que 0 y como mucho 100."""
+        try:
+            valor = Decimal(cls._numero(texto))
+        except InvalidOperation:
+            valor = None
+        if valor is None or not valor.is_finite() or valor <= 0 or valor > 100:
+            raise DatosInvalidos({"riesgo": "Ingresa el % del capital a arriesgar (por ejemplo: 1)."})
+        return valor
 
     # ---------------------------------------------------------- lectura de lo escrito
     def _leer_limite(self, s: SolicitudOrden) -> Optional[Decimal]:

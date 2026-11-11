@@ -3,6 +3,8 @@
   - Cada 3 s pide TODO el estado de una vez (resumen del activo elegido, posiciones, órdenes pendientes e
     historial): así el P&L sigue al precio y se ve cuándo el worker ejecuta una orden límite o un stop-loss.
   - La estimación se recalcula al escribir, al cambiar de lado o de tipo y con cada precio nuevo.
+  - La calculadora de riesgo: «Sugerir stop» pide el ATR (lee velas: va en segundo plano) y «Calcular cantidad»
+    es un cálculo con lo que ya se sabe.
   - Antes de enviar una orden se valida y se pide confirmación; mientras se envía no se acepta otra.
   - Cada petición lleva un número: si llega una vieja (el usuario ya eligió otro activo), se descarta.
   - El gráfico es de GraficoController: aquí solo se le avisa qué activo se eligió.
@@ -22,13 +24,15 @@ class OperarController(PanelController):
         self._session = session
         self._al_elegir_activo = al_elegir_activo
         self._resumen = None          # lo último que se supo del activo elegido (None mientras llega)
+        self._patrimonio = None       # saldo + valor de las posiciones, para expresar el riesgo como % del capital
         self._solicitud = 0
         self._id_inicial = None
         vista.vincular_acciones(
             al_elegir_activo=self._elegir, al_cambiar_orden=self._actualizar_estimacion,
             al_porcentaje=self.elegir_porcentaje, al_enviar=self.enviar,
             al_cerrar_posicion=self.cerrar_posicion, al_cerrar_todas=self.cerrar_todas,
-            al_guardar_proteccion=self.guardar_proteccion, al_cancelar_orden=self.cancelar_orden)
+            al_guardar_proteccion=self.guardar_proteccion, al_cancelar_orden=self.cancelar_orden,
+            al_sugerir_stop=self.sugerir_stop, al_calcular_cantidad=self.calcular_cantidad)
 
     def cargar(self, id_activo=None) -> None:
         """Pide la lista de activos; al llegar, muestra todo y empieza el refresco.
@@ -46,6 +50,28 @@ class OperarController(PanelController):
         except ErrorAplicacion as error:
             self._al_fallar(error)
 
+    def sugerir_stop(self) -> None:
+        """Propone un stop-loss a 2 ATR bajo el precio de entrada y lo pone en su caja."""
+        id_activo = self._vista.activo_elegido()
+        if id_activo is None:
+            return
+        solicitud, actor = self._vista.solicitud(), self._session.usuario
+        self._vista.limpiar_mensaje()
+        self._ejecutar(lambda: self._servicio.sugerir_stop(actor, id_activo, solicitud),
+                       al_terminar=self._vista.mostrar_stop_sugerido)
+
+    def calcular_cantidad(self) -> None:
+        """Calcula cuántas unidades comprar para arriesgar el % escrito hasta el stop-loss escrito."""
+        if self._resumen is None:
+            return
+        try:
+            resultado = self._servicio.cantidad_por_riesgo(
+                self._resumen, self._vista.solicitud(), self._vista.riesgo_escrito(), self._patrimonio)
+        except ErrorAplicacion as error:
+            self._al_fallar(error)
+            return
+        self._vista.mostrar_cantidad_por_riesgo(resultado)
+
     def enviar(self) -> None:
         if self._vista.ocupado:
             return   # ya hay una orden en curso
@@ -57,7 +83,7 @@ class OperarController(PanelController):
             return
         solicitud, actor = self._vista.solicitud(), self._session.usuario
         try:
-            self._servicio.estimar(self._resumen, solicitud)    # que el error salga ANTES de confirmar
+            self._servicio.estimar(self._resumen, solicitud, self._patrimonio)    # que el error salga ANTES de confirmar
         except ErrorAplicacion as error:
             self._vista.mostrar_error(str(error))
             return
@@ -131,6 +157,7 @@ class OperarController(PanelController):
         if numero != self._solicitud:
             return
         self._resumen = estado.resumen
+        self._patrimonio = estado.patrimonio
         if estado.resumen is not None:
             self._vista.mostrar_resumen(estado.resumen)
         self._vista.mostrar_posiciones(estado.posiciones)
@@ -143,7 +170,7 @@ class OperarController(PanelController):
             self._vista.mostrar_estimacion(None)
             return
         try:
-            estimacion = self._servicio.estimar(self._resumen, self._vista.solicitud())
+            estimacion = self._servicio.estimar(self._resumen, self._vista.solicitud(), self._patrimonio)
         except ErrorAplicacion as error:
             self._vista.mostrar_error_estimacion(str(error))
             return

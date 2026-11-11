@@ -1,7 +1,7 @@
-"""Pruebas de SMA y EMA."""
+"""Pruebas de los indicadores: SMA, EMA, Bollinger, RSI, MACD y ATR."""
 import unittest
 
-from simultradia.analisis.indicadores import bollinger, ema, macd, rsi, sma
+from simultradia.analisis.indicadores import atr, bollinger, ema, macd, rsi, sma
 
 
 class PruebasIndicadores(unittest.TestCase):
@@ -24,7 +24,6 @@ class PruebasIndicadores(unittest.TestCase):
     def test_el_largo_siempre_coincide_con_la_entrada(self):
         datos = [float(i) for i in range(40)]
         self.assertEqual((len(sma(datos, 20)), len(ema(datos, 50))), (40, 40))
-
 
     # ------------------------------------------------------------ Bollinger
     def test_bollinger_en_una_serie_constante_las_bandas_coinciden_con_la_media(self):
@@ -72,6 +71,24 @@ class PruebasIndicadores(unittest.TestCase):
         self.assertEqual(linea.index(next(v for v in linea if v is not None)), 25)   # 26 datos para la lenta
         self.assertEqual(senal.index(next(v for v in senal if v is not None)), 33)   # +9 para la señal
         self.assertAlmostEqual(histograma[-1], linea[-1] - senal[-1])
+
+    # ------------------------------------------------------------------ ATR
+    def test_atr_de_velas_con_el_mismo_rango_es_ese_rango(self):
+        self.assertEqual(atr([12.0] * 5, [10.0] * 5, [11.0] * 5, 2), [None, None, 2.0, 2.0, 2.0])
+
+    def test_atr_cuenta_los_huecos_entre_velas(self):
+        # La 2.ª vela va de 18 a 20 (rango 2), pero la anterior cerró en 10: el recorrido real fue de 10.
+        self.assertEqual(atr([11.0, 20.0], [9.0, 18.0], [10.0, 19.0], 1), [None, 10.0])
+
+    def test_atr_suaviza_con_wilder(self):
+        # Rangos (desde la 2.ª vela): 4, 6, 6. El primer ATR es el promedio de los 2 primeros; luego se suaviza.
+        resultado = atr([2.0, 4.0, 6.0, 6.0], [0.0, 0.0, 0.0, 0.0], [1.0, 2.0, 3.0, 3.0], 2)
+        self.assertEqual(resultado, [None, None, 5.0, 5.5])
+
+    def test_atr_con_pocos_datos_o_con_el_largo_de_la_entrada(self):
+        self.assertEqual(atr([2.0, 2.0], [1.0, 1.0], [1.5, 1.5], 14), [None, None])
+        datos = [float(i) + 2 for i in range(40)]
+        self.assertEqual(len(atr(datos, [d - 1 for d in datos], datos, 14)), 40)
 
 
 if __name__ == "__main__":

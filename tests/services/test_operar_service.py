@@ -9,7 +9,8 @@ from simultradia.domain.entities.cotizacion_entity import Cotizacion
 from simultradia.domain.entities.cuenta_simulada_entity import CuentaSimulada
 from simultradia.domain.entities.posicion_entity import Posicion
 from simultradia.domain.entities.usuario_entity import Usuario
-from simultradia.domain.enums import EstadoOrden, LadoOrden, RolUsuario, TipoOrden
+from simultradia.domain.entities.vela_entity import Vela
+from simultradia.domain.enums import EstadoOrden, IntervaloVela, LadoOrden, RolUsuario, TipoOrden
 from simultradia.services.operar_service import OperarService, SolicitudOrden
 from tests.fakes import DatabaseFalsa, RepoActivoFalso, RepoPrecioFalso
 
@@ -119,7 +120,7 @@ class _Base(unittest.TestCase):
                                      saldo_disponible=D("10000"), id_cuenta=1, comision_pct=D("0.1"))
         self.cuentas, self.posiciones, self.ordenes = CuentaRepoFalso(self.cuenta), PosicionRepoFalso(), OrdenRepoFalso()
         self.servicio = OperarService(DatabaseFalsa(), self.cuentas, self.posiciones, self.ordenes,
-                                      self.repo_activos, reloj=lambda: AHORA)
+                                      self.repo_activos, self.precios, reloj=lambda: AHORA)
 
     def _resumen(self, id_activo=1):
         return self.servicio.obtener_resumen(ANA, id_activo)
@@ -235,6 +236,7 @@ class PruebasMercado(_Base):
                             lambda a: self.servicio.vender_todo(a, 1), lambda a: self.servicio.cerrar_todas(a),
                             lambda a: self.servicio.cancelar_orden(a, 1),
                             lambda a: self.servicio.editar_proteccion(a, 1, "90", ""),
+                            lambda a: self.servicio.sugerir_stop(a, 1, _s(COMPRA, "1")),
                             lambda a: self.servicio.obtener_estado(a, 1), lambda a: self.servicio.obtener_resumen(a, 1),
                             lambda a: self.servicio.listar_historial(a), lambda a: self.servicio.listar_posiciones(a)):
                 with self.assertRaises(ErrorPermisos):
@@ -330,9 +332,121 @@ class PruebasMercado(_Base):
         self.assertEqual((estado.resumen.posicion.cantidad, len(estado.posiciones), len(estado.pendientes),
                           len(estado.historial)), (D("10"), 1, 1, 1))
 
+    def test_obtener_estado_trae_el_patrimonio(self):
+        self.assertEqual(self.servicio.obtener_estado(ANA, 1).patrimonio, D("10000"))
+        self.servicio.comprar(ANA, 1, "10")                              # saldo 8999 + 10 x 100
+        self._precio("110")
+        self.assertEqual(self.servicio.obtener_estado(ANA, 1).patrimonio, D("10099"))
+        self.posiciones.insertar(None, Posicion(1, 2, D("2"), D("5")))   # sin precio: se valora a lo que costó
+        self.assertEqual(self.servicio.obtener_estado(ANA, 1).patrimonio, D("10109"))
+
     def test_obtener_estado_sin_activo_elegido_o_con_uno_que_ya_no_existe(self):
         self.assertIsNone(self.servicio.obtener_estado(ANA, None).resumen)
         self.assertIsNone(self.servicio.obtener_estado(ANA, 4).resumen)         # deshabilitado: el panel no se rompe
+
+
+class PruebasCalculadoraDeRiesgo(_Base):
+    def _velas(self, n=30, alto="110", bajo="100", cierre="105", id_activo=1):
+        """`n` velas diarias iguales: todas con el mismo rango (alto - bajo), así el ATR es ese rango."""
+        base = datetime(2026, 9, 1, tzinfo=timezone.utc).timestamp()
+        self.precios.velas[(id_activo, IntervaloVela.D1)] = [
+            Vela(datetime.fromtimestamp(base + i * 86400, tz=timezone.utc), D(cierre), D(alto), D(bajo), D(cierre), D("10"))
+            for i in range(n)]
+
+    # -------------------------------------------------------- riesgo en la estimación
+    def test_la_estimacion_de_una_compra_con_stop_trae_el_riesgo(self):
+        e = self.servicio.estimar(self._resumen(), _s(COMPRA, "10", sl="90"), D("10000"))
+        # por unidad: caída 10 + comisiones (100 + 90) x 0,1 % = 10,19  ->  101,9
+        self.assertEqual((e.riesgo, e.riesgo_pct), (D("101.9"), D("1.019")))
+
+    def test_sin_stop_o_sin_patrimonio(self):
+        resumen = self._resumen()
+        self.assertIsNone(self.servicio.estimar(resumen, _s(COMPRA, "10"), D("10000")).riesgo)
+        e = self.servicio.estimar(resumen, _s(COMPRA, "10", sl="90"))
+        self.assertEqual((e.riesgo, e.riesgo_pct), (D("101.9"), None))
+
+    # ------------------------------------------------------------ cantidad por riesgo
+    def test_la_cantidad_por_riesgo_no_pierde_mas_de_lo_pedido(self):
+        r = self.servicio.cantidad_por_riesgo(self._resumen(), _s(COMPRA, "", sl="90"), "1", D("10000"))
+        self.assertTrue(D("9.81") < r.cantidad < D("9.82"))              # 100 / 10,19
+        self.assertTrue(D("99.9") < r.riesgo <= D("100"))
+        self.assertEqual((r.riesgo_pct, r.limitada_por_saldo), (D("1"), False))
+
+    def test_la_cantidad_por_riesgo_usa_el_patrimonio_o_en_su_defecto_el_saldo(self):
+        resumen = self._resumen()
+        con = self.servicio.cantidad_por_riesgo(resumen, _s(COMPRA, "", sl="90"), "1", D("20000"))
+        sin = self.servicio.cantidad_por_riesgo(resumen, _s(COMPRA, "", sl="90"), "1")
+        self.assertTrue(D("19.6") < con.cantidad < D("19.7"))
+        self.assertTrue(D("9.81") < sin.cantidad < D("9.82"))
+
+    def test_si_el_saldo_no_alcanza_se_compra_lo_que_alcance(self):
+        r = self.servicio.cantidad_por_riesgo(self._resumen(), _s(COMPRA, "", sl="99.9"), "5", D("10000"))
+        self.assertTrue(r.limitada_por_saldo)
+        e = self.servicio.estimar(self._resumen(), _s(COMPRA, str(r.cantidad), sl="99.9"))
+        self.assertTrue(D("0") <= e.saldo_despues < D("1"))
+
+    def test_en_una_compra_limite_se_calcula_con_el_precio_limite(self):
+        r = self.servicio.cantidad_por_riesgo(self._resumen(), _s(COMPRA, "", LIMITE, "80", sl="70"), "1", D("10000"))
+        self.assertTrue(D("9.85") < r.cantidad < D("9.86"))               # 100 / (10 + 0,15)
+
+    def test_errores_de_la_calculadora(self):
+        resumen = self._resumen()
+        for solicitud, riesgo, campo in ((_s(COMPRA, ""), "1", "stop_loss"),                  # falta el stop
+                                         (_s(COMPRA, "", sl="100"), "1", "stop_loss"),         # no está por debajo
+                                         (_s(COMPRA, "", sl="150"), "1", "stop_loss"),
+                                         (_s(COMPRA, "", sl="90"), "0", "riesgo"),
+                                         (_s(COMPRA, "", sl="90"), "abc", "riesgo"),
+                                         (_s(COMPRA, "", sl="90"), "150", "riesgo"),
+                                         (_s(COMPRA, "", sl="90"), "", "riesgo")):
+            with self.subTest(solicitud=solicitud, riesgo=riesgo):
+                with self.assertRaises(DatosInvalidos) as c:
+                    self.servicio.cantidad_por_riesgo(resumen, solicitud, riesgo, D("10000"))
+                self.assertEqual(list(c.exception.errores), [campo])
+        with self.assertRaises(ErrorOperacionInvalida):
+            self.servicio.cantidad_por_riesgo(resumen, _s(VENTA, "", sl="90"), "1", D("10000"))
+        self.cuenta.saldo_disponible = D("0")
+        with self.assertRaises(ErrorOperacionInvalida):
+            self.servicio.cantidad_por_riesgo(self._resumen(), _s(COMPRA, "", sl="90"), "1", D("10000"))
+
+    # ------------------------------------------------------------------- stop sugerido
+    def test_el_stop_sugerido_esta_a_dos_atr_del_precio(self):
+        self._velas()                                                     # rango de cada vela: 10  ->  ATR = 10
+        s = self.servicio.sugerir_stop(ANA, 1, _s(COMPRA, ""))
+        self.assertEqual((s.atr, s.referencia, s.stop_loss), (D("10"), D("100"), D("80")))
+
+    def test_el_stop_sugerido_parte_del_precio_limite_si_lo_hay(self):
+        self._velas()
+        self.assertEqual(self.servicio.sugerir_stop(ANA, 1, _s(COMPRA, "", LIMITE, "90")).stop_loss, D("70"))
+
+    def test_el_stop_sugerido_parte_del_precio_con_deslizamiento(self):
+        self._velas()
+        self.cuenta.deslizamiento_pct = D("1")
+        s = self.servicio.sugerir_stop(ANA, 1, _s(COMPRA, ""))
+        self.assertEqual((s.referencia, s.stop_loss), (D("101"), D("81")))
+
+    def test_el_stop_sugerido_cabe_en_la_calculadora(self):
+        self._velas()
+        stop = self.servicio.sugerir_stop(ANA, 1, _s(COMPRA, "")).stop_loss
+        r = self.servicio.cantidad_por_riesgo(self._resumen(), _s(COMPRA, "", sl=str(stop)), "1", D("10000"))
+        self.assertTrue(D("4.9") < r.cantidad < D("5"))                   # 100 / (20 + 0,18)
+
+    def test_sin_velas_suficientes_no_hay_stop_sugerido(self):
+        for n in (0, 14):
+            self._velas(n)
+            with self.assertRaises(ErrorOperacionInvalida):
+                self.servicio.sugerir_stop(ANA, 1, _s(COMPRA, ""))
+
+    def test_un_atr_enorme_no_da_un_stop_negativo(self):
+        self._velas(alto="400", bajo="0")
+        with self.assertRaises(ErrorOperacionInvalida):
+            self.servicio.sugerir_stop(ANA, 1, _s(COMPRA, ""))
+
+    def test_el_stop_sugerido_es_solo_para_compras_con_precio(self):
+        self._velas()
+        with self.assertRaises(ErrorOperacionInvalida):
+            self.servicio.sugerir_stop(ANA, 1, _s(VENTA, ""))
+        with self.assertRaises(ErrorOperacionInvalida):
+            self.servicio.sugerir_stop(ANA, 2, _s(COMPRA, ""))            # sin precio
 
 
 class PruebasLimite(_Base):
