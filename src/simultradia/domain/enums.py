@@ -24,3 +24,25 @@ class IntervaloVela(str, Enum):
     H4 = "4h"
     D1 = "1d"
     W1 = "1w"
+
+
+class LadoOrden(str, Enum):
+    COMPRA = "compra"
+    VENTA = "venta"
+
+
+class TipoOrden(str, Enum):
+    MERCADO = "mercado"
+    LIMITE = "limite"
+    STOP_LOSS = "stop_loss"
+    TAKE_PROFIT = "take_profit"
+    STOP_LIMITE = "stop_limite"
+
+
+class EstadoOrden(str, Enum):
+    PENDIENTE = "pendiente"
+    PARCIAL = "parcial"
+    EJECUTADA = "ejecutada"
+    CANCELADA = "cancelada"
+    RECHAZADA = "rechazada"
+    EXPIRADA = "expirada"

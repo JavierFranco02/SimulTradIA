@@ -3,6 +3,10 @@
 Vista pasiva: GraficoController le dice qué mostrar. Mientras no hay activo elegido muestra una
 indicación. Los interruptores de indicadores y la cantidad de velas solo cambian cómo se dibuja:
 no hace falta pedir nada al servicio.
+
+Con `compacto=True` (lo usa Operar, que comparte la pantalla con el ticket y las tablas) ocupa menos
+alto: el encabezado cabe en una línea, se quita la línea de máx/mín/volumen del día y los
+interruptores de indicadores pasan a un menú «Indicadores».
 """
 import tkinter as tk
 from typing import Callable, Optional
@@ -16,7 +20,7 @@ from simultradia.domain.reglas.intervalos import DISPONIBLES
 from simultradia.iu.base.panel_view import PanelView
 from simultradia.iu.components import CandleChart, SelectField
 from simultradia.iu.components.candle_render import OpcionesGrafico
-from simultradia.iu.formato import TIPO_SINGULAR, compacto, hace, porcentaje, precio
+from simultradia.iu.formato import TIPO_SINGULAR, compacto as numero_compacto, hace, porcentaje, precio
 from simultradia.iu.styles import ButtonStyle, Colors, Fonts, Spacing
 
 _ETIQUETAS = {IntervaloVela.M15: "15 min", IntervaloVela.H1: "1 h", IntervaloVela.H4: "4 h",
@@ -35,9 +39,10 @@ _INDICADORES = (
 
 
 class GraficoActivoView(PanelView):
-    def __init__(self, parent):
+    def __init__(self, parent, compacto: bool = False):
         super().__init__(parent, padding=Spacing.SM)
         self._al_cambiar_intervalo: Optional[Callable[[IntervaloVela], None]] = None
+        self._compacto = compacto
 
         self._indicacion = ttk.Label(self, text="Elige un activo de la lista para ver su gráfico.",
                                      font=Fonts.SUBTITLE, bootstyle=Colors.MUTED)
@@ -48,18 +53,29 @@ class GraficoActivoView(PanelView):
         cabecera.pack(fill="x", pady=(0, Spacing.SM))
         nombres = ttk.Frame(cabecera)
         nombres.pack(side="left")
-        self._ticker = ttk.Label(nombres, text="", font=Fonts.TITLE)
-        self._ticker.pack(anchor="w")
-        self._detalle = ttk.Label(nombres, text="", font=Fonts.SUBTITLE, bootstyle=Colors.MUTED)
-        self._detalle.pack(anchor="w")
         cifras = ttk.Frame(cabecera)
         cifras.pack(side="right")
-        self._precio = ttk.Label(cifras, text="—", font=Fonts.DISPLAY)
-        self._precio.pack(anchor="e")
-        self._variacion = ttk.Label(cifras, text="", font=Fonts.HEADING)
-        self._variacion.pack(anchor="e")
+        if compacto:     # todo en una línea
+            self._ticker = ttk.Label(nombres, text="", font=Fonts.HEADING)
+            self._ticker.pack(side="left")
+            self._detalle = ttk.Label(nombres, text="", font=Fonts.SMALL, bootstyle=Colors.MUTED)
+            self._detalle.pack(side="left", padx=(Spacing.SM, 0), pady=(Spacing.SM, 0))
+            self._precio = ttk.Label(cifras, text="—", font=Fonts.HEADING)
+            self._precio.pack(side="left")
+            self._variacion = ttk.Label(cifras, text="", font=Fonts.SUBTITLE)
+            self._variacion.pack(side="left", padx=(Spacing.SM, 0), pady=(Spacing.XS, 0))
+        else:
+            self._ticker = ttk.Label(nombres, text="", font=Fonts.TITLE)
+            self._ticker.pack(anchor="w")
+            self._detalle = ttk.Label(nombres, text="", font=Fonts.SUBTITLE, bootstyle=Colors.MUTED)
+            self._detalle.pack(anchor="w")
+            self._precio = ttk.Label(cifras, text="—", font=Fonts.DISPLAY)
+            self._precio.pack(anchor="e")
+            self._variacion = ttk.Label(cifras, text="", font=Fonts.HEADING)
+            self._variacion.pack(anchor="e")
         self._datos_dia = ttk.Label(self._contenido, text="", font=Fonts.SMALL, bootstyle=Colors.MUTED)
-        self._datos_dia.pack(anchor="w", pady=(0, Spacing.SM))
+        if not compacto:
+            self._datos_dia.pack(anchor="w", pady=(0, Spacing.SM))
 
         barra = ttk.Frame(self._contenido)
         barra.pack(fill="x")
@@ -73,19 +89,30 @@ class GraficoActivoView(PanelView):
         self._velas.al_cambiar(self._pulsar_opciones)
         self._velas.pack(side="right")
 
-        interruptores = ttk.Frame(self._contenido)
-        interruptores.pack(fill="x", pady=(Spacing.SM, Spacing.SM))
-        ttk.Label(interruptores, text="Indicadores", font=Fonts.BODY,
-                  bootstyle=Colors.MUTED).pack(side="left", padx=(0, Spacing.MD))
         self._activos = {}
-        for clave, texto, encendido in _INDICADORES:
-            self._activos[clave] = tk.BooleanVar(master=self, value=encendido)
-            ttk.Checkbutton(interruptores, text=texto, variable=self._activos[clave],
-                            command=self._pulsar_opciones, bootstyle=ButtonStyle.SWITCH
-                            ).pack(side="left", padx=(0, Spacing.MD))
+        if compacto:
+            menu_boton = ttk.Menubutton(barra, text="Indicadores ▾", bootstyle=ButtonStyle.LIGHT_OUTLINE)
+            menu = tk.Menu(menu_boton, tearoff=False)
+            for clave, texto, encendido in _INDICADORES:
+                self._activos[clave] = tk.BooleanVar(master=self, value=encendido)
+                menu.add_checkbutton(label=texto, variable=self._activos[clave], command=self._pulsar_opciones)
+            menu_boton.configure(menu=menu)
+            menu_boton.pack(side="right", padx=(0, Spacing.SM))
+            espacio_chart = (Spacing.SM, 0)
+        else:
+            interruptores = ttk.Frame(self._contenido)
+            interruptores.pack(fill="x", pady=(Spacing.SM, Spacing.SM))
+            ttk.Label(interruptores, text="Indicadores", font=Fonts.BODY,
+                      bootstyle=Colors.MUTED).pack(side="left", padx=(0, Spacing.MD))
+            for clave, texto, encendido in _INDICADORES:
+                self._activos[clave] = tk.BooleanVar(master=self, value=encendido)
+                ttk.Checkbutton(interruptores, text=texto, variable=self._activos[clave],
+                                command=self._pulsar_opciones, bootstyle=ButtonStyle.SWITCH
+                                ).pack(side="left", padx=(0, Spacing.MD))
+            espacio_chart = (0, 0)
 
         self._grafico = CandleChart(self._contenido)
-        self._grafico.pack(fill="both", expand=True)
+        self._grafico.pack(fill="both", expand=True, pady=espacio_chart)
         self._grafico.establecer_opciones(self._opciones())
 
     def vincular_acciones(self, al_cambiar_intervalo: Callable[[IntervaloVela], None]) -> None:
@@ -109,8 +136,9 @@ class GraficoActivoView(PanelView):
         color = Colors.SUCCESS if v and v > 0 else Colors.DANGER if v and v < 0 else Colors.MUTED
         flecha = "▲ " if v and v > 0 else "▼ " if v and v < 0 else ""
         self._precio.configure(text="%s %s" % (precio(c.precio), a.moneda))
+        sufijo = "" if self._compacto else "  (%s)" % periodo
         self._variacion.configure(
-            text=flecha + (porcentaje(v, con_signo=True) if v is not None else "—") + "  (%s)" % periodo,
+            text=flecha + (porcentaje(v, con_signo=True) if v is not None else "—") + sufijo,
             bootstyle=color)
         partes = []
         if c.maximo_dia is not None:
@@ -118,7 +146,7 @@ class GraficoActivoView(PanelView):
         if c.minimo_dia is not None:
             partes.append("Mín. %s %s" % (periodo, precio(c.minimo_dia)))
         if c.volumen_dia:    # las divisas y los índices no informan volumen
-            partes.append("Vol. %s USD" % compacto(c.volumen_dia))
+            partes.append("Vol. %s USD" % numero_compacto(c.volumen_dia))
         partes.append("actualizado " + hace(c.actualizado_en))
         self._datos_dia.configure(text="   ·   ".join(partes))
 

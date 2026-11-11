@@ -84,3 +84,22 @@ def macd(valores: Sequence[float], rapida: int = 12, lenta: int = 26, senal: int
             linea_senal[primero + k] = v
     histograma = [None if a is None or b is None else a - b for a, b in zip(linea, linea_senal)]
     return linea, linea_senal, histograma
+
+
+def atr(maximos: Sequence[float], minimos: Sequence[float], cierres: Sequence[float],
+        periodo: int = 14) -> List[Optional[float]]:
+    """Rango verdadero promedio (ATR), con el suavizado de Wilder: cuánto se mueve el precio, en promedio, en una vela.
+    El rango de cada vela es el mayor entre (máximo - mínimo) y la distancia de su máximo y su mínimo al cierre anterior,
+    para no perder los huecos entre una vela y otra. Está en las mismas unidades que el precio."""
+    n = len(cierres)
+    resultado: List[Optional[float]] = [None] * n
+    if n <= periodo:
+        return resultado
+    rangos = [max(maximos[i] - minimos[i], abs(maximos[i] - cierres[i - 1]), abs(minimos[i] - cierres[i - 1]))
+              for i in range(1, n)]               # rangos[j] es el de la vela j + 1
+    valor = sum(rangos[:periodo]) / periodo
+    resultado[periodo] = valor
+    for i in range(periodo, len(rangos)):
+        valor = (valor * (periodo - 1) + rangos[i]) / periodo
+        resultado[i + 1] = valor
+    return resultado

@@ -17,6 +17,8 @@ from simultradia.clients.yahoo_client import YahooCliente
 from simultradia.repositories.activo_repository import ActivoRepository
 from simultradia.repositories.cuenta_repository import CuentaRepository
 from simultradia.repositories.fuente_repository import FuenteRepository
+from simultradia.repositories.orden_repository import OrdenRepository
+from simultradia.repositories.posicion_repository import PosicionRepository
 from simultradia.repositories.precio_repository import PrecioRepository
 from simultradia.repositories.usuario_repository import UsuarioRepository
 from simultradia.services.activo_admin_service import ActivoAdminService
@@ -24,6 +26,7 @@ from simultradia.services.fuente_admin_service import FuenteAdminService
 from simultradia.services.grafico_service import GraficoService
 from simultradia.services.ingesta_service import IngestaService
 from simultradia.services.mercado_service import MercadoService
+from simultradia.services.operar_service import OperarService
 from simultradia.services.usuario_admin_service import UsuarioAdminService
 from simultradia.services.usuario_service import UsuarioService
 
@@ -37,18 +40,20 @@ class Servicios:
     ingesta: IngestaService
     activo_admin: ActivoAdminService
     fuente_admin: FuenteAdminService
+    operar: OperarService
 
 
 def crear_servicios(db) -> Servicios:
-    usuarios, activos = UsuarioRepository(), ActivoRepository()
+    usuarios, activos, cuentas = UsuarioRepository(), ActivoRepository(), CuentaRepository()
     precios, fuentes = PrecioRepository(), FuenteRepository()
     clientes = {cliente.NOMBRE: cliente for cliente in (BinanceCliente(), YahooCliente())}
     return Servicios(
-        usuario=UsuarioService(db, usuarios, CuentaRepository()),
+        usuario=UsuarioService(db, usuarios, cuentas),
         usuario_admin=UsuarioAdminService(db, usuarios),
         mercado=MercadoService(db, activos),
         grafico=GraficoService(db, precios),
         ingesta=IngestaService(db, activos, precios, fuentes, clientes),
         activo_admin=ActivoAdminService(db, activos, precios, fuentes, clientes),
         fuente_admin=FuenteAdminService(db, fuentes),
+        operar=OperarService(db, cuentas, PosicionRepository(), OrdenRepository(), activos, precios),
     )

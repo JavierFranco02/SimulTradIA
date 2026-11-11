@@ -1,4 +1,6 @@
 """Botón que puede quedar «ocupado» (desactivado y con otro texto) mientras algo se procesa."""
+from typing import Optional
+
 import ttkbootstrap as ttk
 
 from simultradia.iu.styles import ButtonStyle
@@ -20,3 +22,11 @@ class ActionButton(ttk.Button):
             state="disabled" if ocupado else "normal",
             text=self._texto_ocupado if ocupado else self._texto,
         )
+
+    def establecer_texto(self, texto: str, texto_ocupado: Optional[str] = None) -> None:
+        """Cambia el texto del botón (p. ej. «Enviar orden de compra» -> «de venta») sin tocar su estado."""
+        self._texto = texto
+        if texto_ocupado is not None:
+            self._texto_ocupado = texto_ocupado
+        if not self.ocupado:
+            self.configure(text=texto)

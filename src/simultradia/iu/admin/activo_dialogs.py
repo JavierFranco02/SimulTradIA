@@ -65,7 +65,7 @@ class _Dialogo(tk.Toplevel):
             campo.ocultar_error()
 
 
-class AgregarActivoDialog(_Dialogo):
+class AgregarActivoDialog(Dialogo):
     def __init__(self, padre, tipos: Sequence[Opcion], fuentes: Sequence[Opcion],
                  al_agregar: Callable[[], None], al_probar: Callable[[], None]):
         super().__init__(padre, "Agregar activo")
