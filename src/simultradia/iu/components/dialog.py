@@ -1,17 +1,18 @@
-"""Base de las ventanas emergentes (modales): centrada sobre la principal, con título, mensaje general y botones.
+"""Base de las ventanas emergentes (modales): centrada sobre la principal, con título y botones.
 
 Cada ventana hija arma su formulario dentro de `self.formulario`, llena `self._campos` (clave del servicio -> campo,
 para repartir los errores por campo) y llama a `self._presentar()` al final de su constructor.
+Los errores de campo salen bajo su campo; cualquier otro aviso es un diálogo sobre esta misma ventana.
 Son vistas pasivas: no llaman a ningún servicio.
 """
 import tkinter as tk
+from tkinter import messagebox
 from typing import Dict
 
 import ttkbootstrap as ttk
 
 from simultradia.iu.components.action_button import ActionButton
 from simultradia.iu.components.form_field import FormField
-from simultradia.iu.components.status_message import StatusMessage
 from simultradia.iu.styles import ButtonStyle, Fonts, Spacing
 
 
@@ -29,8 +30,6 @@ class Dialogo(tk.Toplevel):
         ttk.Label(cuerpo, text=titulo, font=Fonts.HEADING).pack(anchor="w")
         self.formulario = ttk.Frame(cuerpo)
         self.formulario.pack(fill="x")
-        self.mensaje = StatusMessage(cuerpo)
-        self.mensaje.pack(fill="x")
         self.botones = ttk.Frame(cuerpo)
         self.botones.pack(fill="x", pady=(Spacing.MD, 0))
         ActionButton(self.botones, "Cancelar", self.destroy, estilo=ButtonStyle.LINK).pack(side="left")
@@ -48,13 +47,18 @@ class Dialogo(tk.Toplevel):
     def esta_viva(self) -> bool:
         return bool(self.winfo_exists())
 
+    def mostrar_error(self, texto: str) -> None:
+        messagebox.showerror("Error", texto, parent=self)
+
     def mostrar_errores(self, errores: Dict[str, str]) -> None:
-        """Cada mensaje bajo su campo; si no es de un campo de esta ventana, al mensaje general."""
+        """Cada mensaje bajo su campo; si no es de un campo de esta ventana, en un diálogo."""
         for clave, texto in errores.items():
             campo = self._campos.get(clave)
-            (self.mensaje if campo is None else campo).mostrar_error(texto)
+            if campo is None:
+                self.mostrar_error(texto)
+            else:
+                campo.mostrar_error(texto)
 
     def limpiar_errores(self) -> None:
-        self.mensaje.limpiar()
         for campo in self._campos.values():
             campo.ocultar_error()
