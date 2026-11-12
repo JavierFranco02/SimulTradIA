@@ -492,19 +492,10 @@ class OperarView(PanelView):
             "compra" if o.lado == LadoOrden.COMPRA else "venta", unidades(o.cantidad), o.ticker,
             precio(o.precio_limite)))
 
-    # ------------------------------- ventana de stop-loss y take-profit (y a dónde van los mensajes)
-    def _destino(self):
-        """Los mensajes van a la ventana emergente si hay una abierta; si no, al panel."""
-        return self._dialogo.mensaje if self._dialogo is not None and self._dialogo.esta_viva() else self._mensaje
-
-    def mostrar_error(self, texto: str) -> None:
-        self._destino().mostrar_error(texto)
-
-    def mostrar_exito(self, texto: str) -> None:
-        self._destino().mostrar_exito(texto)
-
-    def limpiar_mensaje(self) -> None:
-        self._destino().limpiar()
+    # ------------------------------- ventana de stop-loss y take-profit (y sobre cuál se abren los avisos)
+    def _padre_aviso(self):
+        """Los avisos se abren sobre la ventana de SL/TP si hay una abierta; si no, sobre el panel."""
+        return self._dialogo if self._dialogo is not None and self._dialogo.esta_viva() else self
 
     def mostrar_errores_proteccion(self, errores: Dict[str, str]) -> None:
         if self._dialogo is not None and self._dialogo.esta_viva():
@@ -528,7 +519,6 @@ class OperarView(PanelView):
             return
         v = self._posiciones[str(id_activo)]
         p = v.posicion
-        self._mensaje.limpiar()
         self._dialogo = EditarProteccionDialog(
             self, id_activo, v.ticker,
             "" if p.stop_loss is None else unidades(p.stop_loss),

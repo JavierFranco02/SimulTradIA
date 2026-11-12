@@ -56,7 +56,6 @@ class OperarController(PanelController):
         if id_activo is None:
             return
         solicitud, actor = self._vista.solicitud(), self._session.usuario
-        self._vista.limpiar_mensaje()
         self._ejecutar(lambda: self._servicio.sugerir_stop(actor, id_activo, solicitud),
                        al_terminar=self._vista.mostrar_stop_sugerido)
 
@@ -177,7 +176,6 @@ class OperarController(PanelController):
         self._vista.mostrar_estimacion(estimacion)
 
     def _lanzar(self, trabajo, al_terminar) -> None:
-        self._vista.limpiar_mensaje()
         self._vista.establecer_ocupado(True)
         self._ejecutar(trabajo, al_terminar=al_terminar, al_fallar=self._al_fallar_operar)
 
