@@ -7,14 +7,14 @@ from typing import Callable
 import ttkbootstrap as ttk
 
 from simultradia.iu.components import ActionButton, Dialogo, FormField
-from simultradia.iu.styles import Colors, Fonts, Spacing
+from simultradia.iu.styles import Fonts, Spacing
 
 
 class EditarProteccionDialog(Dialogo):
     def __init__(self, padre, id_activo: int, ticker: str, stop_loss: str, take_profit: str,
                  al_guardar: Callable[[int, str, str], None]):
         super().__init__(padre, "Stop-loss y take-profit · %s" % ticker)
-        ttk.Label(self.formulario, font=Fonts.SMALL, bootstyle=Colors.MUTED, justify="left", wraplength=380,
+        ttk.Label(self.formulario, font=Fonts.SMALL, justify="left", wraplength=380,
                   text="Déjalo vacío para quitar ese nivel. El stop-loss debe quedar por debajo del precio actual "
                        "y el take-profit por encima. Cuando el precio llegue a uno, se vende toda la posición."
                   ).pack(anchor="w", pady=(Spacing.SM, 0))

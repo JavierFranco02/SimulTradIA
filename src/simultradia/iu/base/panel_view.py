@@ -12,7 +12,7 @@ from typing import Callable, List, Optional
 
 import ttkbootstrap as ttk
 
-from simultradia.iu.styles import Colors, Fonts, Spacing
+from simultradia.iu.styles import Fonts, Spacing
 
 
 class PanelView(ttk.Frame):
@@ -22,7 +22,7 @@ class PanelView(ttk.Frame):
         self._tareas: List[str] = []
         if titulo:
             ttk.Label(self, text=titulo, font=Fonts.TITLE).pack(anchor="w")
-            self._subtitulo = ttk.Label(self, text=subtitulo, font=Fonts.SUBTITLE, bootstyle=Colors.MUTED)
+            self._subtitulo = ttk.Label(self, text=subtitulo, font=Fonts.SUBTITLE)
             self._subtitulo.pack(anchor="w", pady=(2, Spacing.MD))
 
     def establecer_subtitulo(self, texto: str) -> None:

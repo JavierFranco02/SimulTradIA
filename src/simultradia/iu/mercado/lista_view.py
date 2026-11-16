@@ -3,7 +3,7 @@
 Vista pasiva: dibuja y expone métodos; ListaController decide qué pedir y cuándo.
 """
 import tkinter as tk
-from typing import Callable, Optional
+from typing import Callable, Dict, Optional
 
 import ttkbootstrap as ttk
 
@@ -12,13 +12,14 @@ from simultradia.domain.enums import TipoActivo
 from simultradia.iu.base.panel_view import PanelView
 from simultradia.iu.components import DataTable, SelectField
 from simultradia.iu.formato import TIPO_PLURAL, hace, porcentaje, precio
-from simultradia.iu.styles import ButtonStyle, Colors, Fonts, Spacing
+from simultradia.iu.styles import ButtonStyle, Colors, Fonts, Spacing, texto_normal
 
 _PESTANAS = (("todos", "Todos"), ("ganadores", "Suben"), ("perdedores", "Bajan"), ("volumen", "Volumen"))
 _COLUMNAS = (
-    ("ticker", "Activo", 120, "w"),
-    ("precio", "Precio", 110, "e"),
-    ("variacion", "Var. %", 90, "e"),
+    ("ticker", "Activo", 110, "w"),
+    ("nombre", "Nombre", 150, "w"),
+    ("precio", "Precio", 100, "e"),
+    ("variacion", "Var. %", 80, "e"),
 )
 
 
@@ -29,6 +30,7 @@ class ListaActivosView(PanelView):
         self._al_elegir_pestana: Optional[Callable[[str], None]] = None
         self._al_ordenar: Optional[Callable[[str], None]] = None
         self._al_elegir_activo: Optional[Callable[[int], None]] = None
+        self._tickers: Dict[str, str] = {}      # id del activo -> ticker (de todo lo que se ha mostrado)
 
         fila = ttk.Frame(self)
         fila.pack(fill="x", pady=(0, Spacing.SM))
@@ -48,15 +50,16 @@ class ListaActivosView(PanelView):
         self._pestana = tk.StringVar(master=self, value="todos")
         for columna, (clave, texto) in enumerate(_PESTANAS):
             pestanas.columnconfigure(columna, weight=1, uniform="pestana")
-            ttk.Radiobutton(pestanas, text=texto, value=clave, variable=self._pestana,
-                            command=self._pulsar_pestana, bootstyle=ButtonStyle.TOGGLE
-                            ).grid(row=0, column=columna, sticky="ew")
+            boton = ttk.Radiobutton(pestanas, text=texto, value=clave, variable=self._pestana,
+                                    command=self._pulsar_pestana, bootstyle=ButtonStyle.TOGGLE)
+            boton.grid(row=0, column=columna, sticky="ew")
+            texto_normal(boton)
 
         self._tabla = DataTable(self, _COLUMNAS)
         self._tabla.pack(fill="both", expand=True)
         self._tabla.al_seleccionar(self._pulsar_activo)
         self._tabla.al_clic_encabezado(self._pulsar_encabezado)
-        self._pie = ttk.Label(self, text="", font=Fonts.SMALL, bootstyle=Colors.MUTED)
+        self._pie = ttk.Label(self, text="", font=Fonts.SMALL)
         self._pie.pack(anchor="w", pady=(Spacing.SM, 0))
 
     def vincular_acciones(self, al_filtrar: Callable[[], None],
@@ -82,13 +85,14 @@ class ListaActivosView(PanelView):
         for item in panel.items:
             c = item.cotizacion
             if c is None:
-                valores, etiqueta = (item.activo.ticker, "—", "—"), ""
+                valores, etiqueta = (item.activo.ticker, item.activo.nombre, "—", "—"), ""
             else:
                 v = c.variacion_pct_dia
-                valores = (item.activo.ticker, precio(c.precio),
+                valores = (item.activo.ticker, item.activo.nombre, precio(c.precio),
                            porcentaje(v, con_signo=True) if v is not None else "—")
                 etiqueta = "alza" if v and v > 0 else "baja" if v and v < 0 else ""
             filas.append((str(item.activo.id_activo), valores, etiqueta))
+            self._tickers[str(item.activo.id_activo)] = item.activo.ticker
         self._tabla.establecer_filas(filas)
         self._tabla.marcar_orden(orden, descendente)
 
@@ -99,7 +103,11 @@ class ListaActivosView(PanelView):
         else:
             self._pie.configure(
                 text="%d activos · actualizado %s" % (len(panel.items), hace(panel.actualizado_en)),
-                bootstyle=Colors.MUTED)
+                style="TLabel")     # el color normal del tema
+
+    def ticker_de(self, id_activo: int) -> Optional[str]:
+        """El ticker de un activo ya mostrado en la lista (para rotular botones, como «Operar AAPL»)."""
+        return self._tickers.get(str(id_activo))
 
     def seleccionar(self, id_activo: int) -> None:
         self._tabla.seleccionar(str(id_activo))

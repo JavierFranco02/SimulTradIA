@@ -47,4 +47,7 @@ class SelectField(ttk.Frame):
         self._lista.current(self._claves.index(clave))
 
     def al_cambiar(self, accion: Callable[[], None]) -> None:
-        self._lista.bind("<<ComboboxSelected>>", lambda _evento: accion())
+        def al_elegir(_evento) -> None:
+            self._lista.selection_clear()     # que el texto elegido no quede resaltado en azul
+            accion()
+        self._lista.bind("<<ComboboxSelected>>", al_elegir)

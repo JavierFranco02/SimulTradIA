@@ -4,7 +4,8 @@ Instrucciones permanentes para Claude. El **código está en los archivos del pr
 este documento explica qué es el proyecto, cómo está organizado y cómo trabajar en él.
 **La base de datos real NO se describe del todo en el repo:** `database/schema.sql` es solo una guía;
 `database/mercado.sql`, `operar.sql` y `operar_fase2.sql` crean las tablas reales de Mercado y de Operar (ver sección 7).
-El estado actual y lo que falta están en la sección 10.
+El estado actual y lo que falta están en la sección 11. **Las reglas de diseño de la interfaz (qué se decidió y por qué)
+están en la sección 5: léela antes de tocar cualquier pantalla.**
 
 ---
 
@@ -46,7 +47,7 @@ permisos se validan en los servicios, no solo ocultando botones; el primer admin
 **Descartado:** social, tutoriales y retos, chat asistente, datos fundamentales, calendario, posiciones cortas,
 apalancamiento, guardar configuraciones de gráfico, exportar PDF/CSV.
 **Previsto más adelante:** una **moneda de la aplicación** configurable, con cambio de moneda según tasa de cambio
-(hoy cada activo guarda su moneda al crearse y no se edita; ver decisión 34).
+(hoy cada activo guarda su moneda al crearse y no se edita; ver decisión 43).
 
 ### Enfoque de la IA
 - Predicción de **dirección con probabilidades** (`prob_alcista + prob_bajista + prob_lateral = 1`) y confianza.
@@ -62,36 +63,46 @@ apalancamiento, guardar configuraciones de gráfico, exportar PDF/CSV.
 
 ## 2. Cómo trabajar en este proyecto
 
-1. **Responde en español** y explica en **lenguaje simple**. El usuario no conoce el mundo del trading y a veces
+1. **Responde en español, directo y sin relleno.** Cero saludos, cero amabilidades ("¡Claro que sí!", "Con gusto
+   te ayudo") y cero despedidas o resúmenes de cortesía. Texto explicativo corto, casi telegráfico; el código y los
+   bloques técnicos, intactos. Explica en **lenguaje simple**: el usuario no conoce el mundo del trading y a veces
    se pierde con patrones de arquitectura (por ejemplo, callbacks) o con términos financieros (apalancamiento, ATR,
    P&L, slippage): usa analogías, ejemplos con números y recorridos paso a paso. Cuando propongas archivos o
    carpetas, explica **para qué sirve cada pieza**.
 2. **Recomienda con argumentos y deja que él decida.** Él cuestiona los diseños y razona sus decisiones. No
    reabras decisiones tomadas (sección 6) salvo que detectes un problema real; si es así, dilo con el motivo.
+   Cuando una opción tiene una limitación técnica (de ttkbootstrap, de tkinter), dila **antes** de que él la elija.
 3. **Entrega los cambios SIEMPRE como un `.zip`** con los archivos **NUEVOS y MODIFICADOS** (mismas rutas que en el
-   repo, archivos completos). **No des código para copiar y pegar** ni fragmentos por archivo: esa mecánica ya no se
-   usa. Junto al zip, di solo qué archivos se **agregaron**, cuáles se **modificaron** y cuáles hay que **borrar a
-   mano** (un zip no puede borrar), más lo que no pudiste verificar. Mantén tu copia interna del proyecto actualizada.
-   **Incluye `contexto_SimulTradIA.md` en el zip cuando el cambio toque arquitectura, decisiones o estado** (el texto
-   completo está en el contexto del proyecto: no hace falta que el usuario lo pida).
+   repo, archivos completos, para copiar, pegar y sobrescribir). **No des código para copiar y pegar** ni fragmentos
+   por archivo, **ni pidas ediciones manuales de "dos líneas"**: si un archivo cambia, va completo en el zip (también
+   `tests/fakes.py`). Mantén **un solo zip acumulativo** por tema (por ejemplo `operar_v3.zip`) que incluya todo lo
+   cambiado desde que él pegó el anterior, para que no se pierda nada. Junto al zip, di solo qué archivos se
+   **agregaron**, cuáles se **modificaron** y cuáles hay que **borrar a mano** (un zip no puede borrar), más lo que no
+   pudiste verificar. **Incluye `contexto_SimulTradIA.md` en el zip cuando el cambio toque arquitectura, decisiones o
+   estado.**
 4. **Lee el archivo actual antes de modificarlo o sobrescribirlo.** Puede haber cambiado desde la última vez
    que lo viste. Si no tienes el código a mano, pídelo antes de escribir cambios.
 5. **Respeta la arquitectura y su estructura de carpetas** (secciones 4 y 5). Si algo no encaja, propón
    el ajuste en lugar de saltarte la capa.
 6. **No compliques.** Nada de archivos o abstracciones sin uso real, ni ajustes, reglas o estilos para
-   valores que se usan en un solo lugar. **Interfaz:** el usuario prefiere mostrar la información como texto, filas
-   o tablas; usa tarjetas (`Card`) solo para agrupar datos relacionados cuando de verdad ordenan la pantalla (hoy: el
-   ticket de Operar). Prefiere interruptores visibles (no botones) para activar o desactivar opciones. Cuando una
-   pantalla se vea mal, pide o usa su captura: la apariencia no se puede verificar sin verla.
+   valores que se usan en un solo lugar. **Interfaz:** ver sección 5.
 7. **El esquema SQL es una guía, no la base real.** Antes de escribir SQL o entidades que toquen una tabla,
    confirma con el usuario qué columnas tiene realmente; no asumas lo que dice `schema.sql`. Las tablas de Mercado y
-   de Operar sí están definidas en `database/mercado.sql`, `operar.sql` y `operar_fase2.sql`.
+   de Operar sí están definidas en `database/mercado.sql`, `operar.sql` y `operar_fase2.sql` (y hay un volcado
+   `database/simultradia_esquema.sql` de la base real, de noviembre de 2026).
 8. **Verifica y sé honesto con lo verificado.** Ejecuta las pruebas (sección 8). Tu entorno normalmente no
    tiene tkinter, ttkbootstrap, psycopg2, ccxt ni yfinance, ni red: lo que simules valida lógica y cableado, **no la
    apariencia real, ni la conexión real a PostgreSQL, Binance o Yahoo**. El dibujo del gráfico sí se puede probar
    (matplotlib sin tkinter). Dilo siempre que aplique. **Las vistas de tkinter solo se compilan, no se ejecutan:** ya
-   hubo un bug (una variable reutilizada al armar un ticket) que las pruebas no podían ver; en métodos largos que
-   arman widgets, usa un nombre distinto para cada cosa y revisa los `return`.
+   hubo errores que las pruebas no podían ver (una variable reutilizada al armar un ticket; un widget que otro método
+   usaba antes de crearse, al cambiar el orden de armado). En métodos largos que arman widgets, usa un nombre distinto
+   para cada cosa, revisa los `return` y comprueba el ORDEN de creación entre métodos que se llaman entre sí.
+9. **Cambios visuales: primero un mockup, después el código.** Para cualquier rediseño de pantalla, antes de escribir
+   código crea un **mockup** (HTML/artefacto visual) para que el usuario lo valide, con varias propuestas si hay
+   dudas. El mockup debe usar SOLO lo que ttkbootstrap puede dibujar (sección 5.4): mismo tema, misma fuente,
+   esquinas rectas, sin íconos. Solo cuando el usuario aprueba (a veces tras varias vueltas) se pasa a código. Cuando
+   pida un cambio, **di qué archivos tocaría** y qué cosas no se pueden hacer. Cuando una pantalla se vea mal, pide o
+   usa su captura: la apariencia no se puede verificar sin verla.
 
 ---
 
@@ -100,7 +111,7 @@ apalancamiento, guardar configuraciones de gráfico, exportar PDF/CSV.
 | Pieza | Elección | Nota |
 |---|---|---|
 | Lenguaje | Python 3.8 o superior | Usa `Optional`/`Dict` de `typing`, no `X \| None`. |
-| Interfaz | `tkinter` + **`ttkbootstrap`** | Tema actual: `darkly`. |
+| Interfaz | `tkinter` + **`ttkbootstrap`** | Tema actual: `darkly`. Fuente: Helvetica. No se cambian sin que él lo pida. |
 | Base de datos | **PostgreSQL 9.3** | Sin JSONB, IDENTITY, `FILTER`, `EXECUTE FUNCTION`, `ON CONFLICT` ni TimescaleDB. |
 | Conector | **`psycopg2-binary`** | `psycopg` v3 es para PostgreSQL 10 o superior. Cursores `NamedTupleCursor` (filas por nombre). |
 | Contraseñas | **`argon2-cffi`** | Nunca se guarda la contraseña real. |
@@ -153,7 +164,8 @@ database/            schema.sql = GUÍA (no es la base real) · mercado.sql = ta
                      operar.sql = tablas REALES de Operar (ordenes, ejecuciones, posiciones, operaciones_cerradas +
                      tipos lado_orden, tipo_orden, estado_orden) · operar_fase2.sql = una sola vez: columnas de
                      límite/stop-loss/take-profit (se puede borrar) · mercado_actualizar.sql y
-                     usuarios_password_temporal.sql = una sola vez, ya usados (se pueden borrar)
+                     usuarios_password_temporal.sql = una sola vez, ya usados (se pueden borrar) ·
+                     simultradia_esquema.sql = volcado (pg_dump) de la base real
 pyproject.toml       paquete instalable (pip install -e .) y dependencias
 tests/               fakes.py compartido; subcarpetas core/, services/, iu/, analisis/, clients/, domain/
 src/simultradia/
@@ -175,7 +187,8 @@ src/simultradia/
   jobs/              actualizar_cotizaciones_job.py, actualizar_velas_job.py, evaluar_ordenes_job.py (el worker los repite)
   ia/                (previsto) modelos y lógica de IA (subdividir en features/entrenamiento/prediccion/explicacion al crecer)
   iu/                interfaz de usuario, agrupada por funcionalidad
-    styles.py        Fonts (incluye VALUE), Colors, Palette (gráfico, tabla y textos apagados), ButtonStyle, Spacing
+    styles.py        Fonts (incluye VALUE), Colors, Palette (SOLO gráfico y tabla), ButtonStyle (incluye SUCCESS),
+                     Spacing, y `texto_normal(boton)` para los toggles
     formato.py       números, porcentajes, cantidades (`unidades`), fechas y nombres de tipos en español (Python puro)
     background.py    ejecutar_en_hilo / iniciar_revision (hilos de la interfaz)
     navegacion.py    Navegador: ir_a("nombre", **parametros)
@@ -188,9 +201,9 @@ src/simultradia/
     auth/            login, registro y cambio de contraseña temporal (vistas, controladores, pantallas.py)
     shell/           ventana "home": menú lateral + área de contenido (ShellView, ShellController)
     inicio/          sección de bienvenida (PROVISIONAL: se rehace al final)
-    mercado/         mercado_view (panel dividido + botón «Operar este activo»), lista_view/lista_controller,
-                     grafico_view (con modo compacto)/grafico_controller
-    operar/          operar_view (ticket + gráfico + pestañas), operar_controller, proteccion_dialog (SL/TP), pantallas.py
+    mercado/         mercado_view (panel dividido + botón «Operar» debajo del gráfico), lista_view/lista_controller,
+                     grafico_view (UN solo componente, sin modo compacto)/grafico_controller
+    operar/          operar_view (ticket a la derecha + gráfico + pestañas), operar_controller, proteccion_dialog (SL/TP), pantallas.py
     admin/           usuarios, activos, ingesta: cada uno con su vista y su controlador;
                      activo_dialogs.py = ventanas emergentes de Activos (agregar y editar el nombre)
     <módulo>/        trading/, backtesting/, ia/... cuando lleguen
@@ -215,7 +228,8 @@ El paquete se llama **`simultradia`** (no `main`: chocaría con `main.py`).
   `navegador.session`. El tamaño de la ventana lo declara cada ruta (`tamano`, `minimo`; el shell: 1280×780, mínimo
   900×600). Una vista de shell expone `contenido` y `marcar_seccion(nombre)`. El menú está en
   `iu/shell/pantallas.py` (`_MENU`, con marca de solo admin; `_SOLO_USUARIOS` oculta secciones al admin, como Operar).
-  Mercado abre Operar con un activo ya elegido: `navegador.ir_a("operar", id_activo=5)`.
+  Mercado abre Operar con un activo ya elegido: `navegador.ir_a("operar", id_activo=5)`. **El menú lateral se queda
+  como está** (decisión 52).
 - **Contraseña temporal:** el admin NUNCA ve la contraseña real de nadie. `UsuarioAdminService.restablecer_password`
   genera una temporal (10 caracteres sin letras que se confunden), guarda solo su hash con `debe_cambiar_password = TRUE`
   y la devuelve UNA vez para que el admin se la entregue (la vista la muestra y la copia al portapapeles). No se aplica a
@@ -234,10 +248,10 @@ El paquete se llama **`simultradia`** (no `main`: chocaría con `main.py`).
   genérico. Las claves de campo (`"nombre"`, `"email"`, `"password"`, `"ticker"`...) son compartidas entre servicio y vista.
 - **Avisos al usuario (diálogos):** en las secciones del panel (`PanelView`) `mostrar_error` y `mostrar_exito` abren un
   diálogo (`messagebox`) sobre la pantalla; nada de texto fijo que se quede ahí. Las vistas con ventanas emergentes
-  (Activos) sobreescriben `_padre_aviso()` para abrir el diálogo sobre la ventana emergente si hay una abierta. Un estado
-  que se repite en cada refresco (p. ej. "Sin precios todavía" en la lista de Mercado) NO es un aviso: va como texto en la
-  propia pantalla (el pie de la lista). En los **refrescos periódicos** (lista y gráfico de Mercado, estado de Ingesta)
-  un fallo que se mantiene se avisa UNA sola vez: `PanelController._avisar_una_vez(clave, error)` y
+  (Activos, Operar/SL-TP) sobreescriben `_padre_aviso()` para abrir el diálogo sobre la ventana emergente si hay una abierta.
+  Un estado que se repite en cada refresco (p. ej. "Sin precios todavía" en la lista de Mercado) NO es un aviso: va como
+  texto en la propia pantalla (el pie de la lista). En los **refrescos periódicos** (lista y gráfico de Mercado, estado de
+  Ingesta) un fallo que se mantiene se avisa UNA sola vez: `PanelController._avisar_una_vez(clave, error)` y
   `_recuperado(clave)`; si no, saldría un diálogo cada pocos segundos. La confirmación "¡Cuenta creada!" del login
   también es un diálogo. Los formularios siguen mostrando el error de cada campo bajo su campo y el error general en
   el propio formulario (`StatusMessage`, que solo muestra errores).
@@ -248,9 +262,9 @@ El paquete se llama **`simultradia`** (no `main`: chocaría con `main.py`).
   si falla, y siempre la devuelve al pool. Todo lo hecho dentro es una sola operación (p. ej. el registro crea
   el usuario y su cuenta simulada juntos). **Nunca se llama a una API externa con una conexión abierta.**
 - **Estilos y componentes:** todo componente es una **clase**. Fuentes, colores y espacios salen solo de
-  `iu/styles.py` (`Fonts` por rol con la familia en `Fonts.FAMILY`; `Palette` para el gráfico, las etiquetas de la
-  tabla y los textos secundarios; `ButtonStyle` para los aspectos de botón). Nunca se escriben a mano. Los textos
-  secundarios usan `foreground=Palette.TEXTO` (el gris `Colors.MUTED` es demasiado oscuro para datos que se deben leer).
+  `iu/styles.py` (`Fonts` por rol con la familia en `Fonts.FAMILY`; `Palette` SOLO para el gráfico y las etiquetas de la
+  tabla; `ButtonStyle` para los aspectos de botón). Nunca se escriben a mano. **El texto de los widgets no lleva color
+  propio** (sección 5.2).
 - **Errores bajo cada campo:** `FormField` incluye un `StatusMessage` oculto que **no ocupa espacio** hasta tener
   texto (tira invisible de 1 px porque Tk no recalcula el tamaño de un contenedor vacío), usa **todo el ancho
   disponible** y se oculta cuando el texto del campo cambia (`StringVar.trace_add`, no `<KeyRelease>`).
@@ -261,9 +275,9 @@ El paquete se llama **`simultradia`** (no `main`: chocaría con `main.py`).
 - **Ventanas emergentes:** `Dialogo` (components) es la base: modal, centrada sobre la principal, con mensaje general y
   errores por campo. La usan Activos (`iu/admin/activo_dialogs.py`: agregar y editar) y Operar (`proteccion_dialog.py`:
   stop-loss y take-profit). Son vistas pasivas que abre la vista de la sección; esta conserva la misma interfaz hacia el
-  controlador y reenvía a la ventana abierta los errores por campo y los mensajes (`_destino()`).. Los errores que no son de un campo y las confirmaciones salen en un diálogo sobre la
-  ventana. Al agregar con éxito la ventana se cierra; doble clic en una fila abre la edición. **Editar solo cambia el
-  nombre**: la moneda de un activo no se edita (decisión 34).
+  controlador y reenvía a la ventana abierta los errores por campo y los mensajes. Los errores que no son de un campo y las
+  confirmaciones salen en un diálogo sobre la ventana. Al agregar con éxito la ventana se cierra; doble clic en una fila
+  abre la edición. **Editar solo cambia el nombre**: la moneda de un activo no se edita (decisión 43).
 - **Probar y actualizar por fuente:** `IngestaService.probar_fuente` le pide a la fuente el precio de su activo de
   ejemplo (`EJEMPLO_TICKER` del cliente) y mide cuánto tarda, sin guardar nada; un fallo se devuelve como resultado, no
   como error. `ejecutar_manual(actor, id_fuente)` actualiza solo una fuente (debe estar habilitada).
@@ -283,18 +297,29 @@ El paquete se llama **`simultradia`** (no `main`: chocaría con `main.py`).
   o 3 s (lista y Operar). No hay websocket. La vela en vivo es la última vela guardada con el precio de ahora aplicado
   (`analisis.velas.aplicar_precio`). Solo la cripto abre velas nuevas en vivo; en acciones, ETF e índices el precio
   llega con retraso y, con el mercado cerrado, no se dibujan velas planas.
-- **Mercado (pantalla):** un panel dividido (`ttk.Panedwindow`): la lista de activos a la izquierda (buscador,
-  categoría, pestañas Todos/Suben/Bajan/Volumen, tabla ordenable) y el gráfico a la derecha. Un clic en la lista
-  muestra el gráfico. El borde se arrastra y un botón oculta o muestra la lista. «Operar este activo» (solo
-  usuarios) abre Operar con ese activo. Dos controladores (`ListaController`, `GraficoController`) se enlazan en
-  `iu/mercado/pantallas.py`: la lista avisa cuál activo se eligió. Cada petición lleva un número y las respuestas
-  viejas (otra búsqueda, otro activo u otro intervalo) se descartan.
-- **Gráfico:** `CandleChart` (Tk) usa `candle_render.dibujar_velas` (matplotlib, sin Tk, probable en pruebas).
-  Arriba, velas + SMA 20, EMA 50 y Bollinger; debajo, solo si se piden, volumen, RSI 14 y MACD (12, 26, 9). Los
-  interruptores y la cantidad de velas (30 a 500) solo cambian el dibujo, no piden nada al servicio. Los parámetros
-  están en `domain/reglas/indicadores.py`. Los cálculos usan `float` solo para dibujar; el dinero sigue en `Decimal`.
-  `GraficoActivoView(compacto=True)` (lo usa Operar) pone el encabezado en una línea, quita el detalle del día y
-  agrupa los indicadores en un menú «Indicadores».
+- **Mercado (pantalla):** título «Mercado» y, debajo, un panel dividido (`ttk.Panedwindow`). **Izquierda:** encabezado
+  «Activos» con el botón «◀» a la derecha, y la lista (buscador, categoría, pestañas Todos/Suben/Bajan/Volumen, tabla
+  ordenable con columnas Activo, Nombre, Precio y Var. %). **Derecha:** el gráfico y, **debajo**, una barra con
+  **«Operar AAPL»** (verde sólido, a la derecha, solo usuarios que operan) que abre Operar con ese activo. El botón de
+  operar lo arma `MercadoView`, NO el gráfico. «◀» oculta la lista; mientras está oculta queda un riel angosto a la izquierda
+  con «▶» para volver a mostrarla (recuerda el ancho). El borde se arrastra. Dos controladores (`ListaController`,
+  `GraficoController`) se enlazan en `iu/mercado/pantallas.py`: la lista avisa cuál activo se eligió. Cada petición lleva un
+  número y las respuestas viejas (otra búsqueda, otro activo u otro intervalo) se descartan. `ListaActivosView.ticker_de(id)`
+  da el ticker para rotular el botón.
+- **Gráfico (`GraficoActivoView`):** UN solo componente que usan Mercado y Operar, con la misma estructura en los dos:
+  **encabezado** (izquierda: ticker en `HEADING` y debajo «nombre · tipo · fuente» en `SUBTITLE`; derecha: precio en
+  `HEADING` y debajo la variación en `SUBTITLE`, con el signo y el color, SIN triángulo, y «(del día)» o «(24 h)» en
+  `SMALL`), línea de **estadísticas** del día (`SMALL`: máx., mín., volumen, actualizado hace), **barra** (intervalos a la
+  izquierda; a la derecha «120 velas ▾» y el menú «Indicadores ▾» con casillas) y el dibujo. No existe versión compacta: el
+  tamaño lo decide el contenedor. En la barra se empaquetan primero los controles de la derecha y al final los intervalos
+  (si la ventana es angosta ceden los intervalos). Los interruptores y la cantidad de velas solo cambian el dibujo.
+- **Dibujo del gráfico (`CandleChart` + `candle_render.dibujar_velas`):** matplotlib, sin Tk, probable en pruebas. Arriba, velas
+  + SMA 20, EMA 50 y Bollinger; debajo, solo si se piden, volumen, RSI 14 y MACD (12, 26, 9). La leyenda de las líneas va
+  arriba a la izquierda, bajo la línea de datos de la vela (no tapa el eje de precios). **Eje horizontal:** en velas de menos de
+  un día cada marca lleva la **hora** («16:30») y, al cambiar el día (o en la primera), debajo la fecha («19 oct»); en velas de
+  un día o más lleva la fecha y, al cambiar el año, el año. Unas 8 marcas, en la zona horaria del equipo. NO hay leyenda
+  explicativa bajo el eje (se quitó: ocupaba espacio). La línea de datos al pasar el mouse empieza con la fecha (y la hora si es
+  intradía). Parámetros en `domain/reglas/indicadores.py`. Los cálculos usan `float` solo para dibujar; el dinero sigue en `Decimal`.
 - **Operar (servicio y reglas):** `OperarService` + `domain/reglas/operaciones.py` (comisión, deslizamiento, compra y
   venta, estimación, riesgo y disparadores: UNA sola implementación para Operar, Replay, Backtesting y el worker).
   - **Orden a mercado:** se ejecuta en el acto contra `cotizaciones_actuales`, en UNA transacción que bloquea la cuenta
@@ -326,16 +351,33 @@ El paquete se llama **`simultradia`** (no `main`: chocaría con `main.py`).
   - **Cálculos para la pantalla sin BD:** `estimar`, `cantidad_para` y `cantidad_por_riesgo` trabajan con el
     `ResumenOperar` ya leído, para recalcular mientras el usuario escribe. `obtener_estado` entrega, en UNA conexión, el
     resumen del activo elegido, las posiciones con su P&L no realizado, las órdenes pendientes, el historial y el patrimonio.
-- **Operar (pantalla):** panel dividido (`ttk.Panedwindow`). A la izquierda, el **ticket** dentro de un `ScrollFrame`:
-  activo; tarjeta de la cuenta (saldo y posición con precio promedio, P&L y niveles); Comprar/Vender (verde/rojo); tipo
-  (Mercado/Límite) y precio límite; cantidad con Máx. y 25/50/75 %; stop-loss y take-profit; tarjeta de la calculadora de
-  riesgo; tarjeta con el resumen de la orden (precio, monto, comisión, total, saldo después, riesgo hasta el stop,
-  ganancia estimada) y el botón de enviar (cambia de texto y color según el lado). A la derecha, el gráfico compacto (el
-  66 % del alto al abrir) y, debajo, pestañas: Posiciones abiertas (Cerrar posición, Editar SL/TP, Cerrar todas),
-  Órdenes pendientes (Cancelar orden) e Historial (con Nota para los rechazos). Cada caja solo se habilita cuando aplica
-  (el límite en las órdenes límite; SL/TP y calculadora al comprar). Antes de enviar se valida y se pide confirmación.
-  `OperarController` refresca todo cada 3 s con una sola llamada y recalcula la estimación al escribir; el gráfico lo
-  maneja su propio `GraficoController`, al que `pantallas.py` conecta.
+- **Operar (pantalla):**
+  - **Disposición:** arriba, una **franja** con «Operar» a la izquierda y, a la derecha, **Saldo disponible** y **Patrimonio**
+    (rótulo pequeño + cifra en `VALUE`). Debajo, un panel dividido horizontal: **a la izquierda** (la parte grande) el
+    gráfico (el mismo `GraficoActivoView`) y, debajo, las pestañas Posiciones abiertas / Órdenes pendientes / Historial
+    (borde vertical arrastrable; el gráfico se lleva ~66 % del alto al abrir); **a la derecha**, el **ticket** de 340 px
+    dentro de un `ScrollFrame`.
+  - **Ticket (de arriba abajo):** selector de Activo · una línea «Tienes 2 AAPL» (izquierda) y el P&L (derecha, verde/rojo) ·
+    Comprar/Vender (toggles verde/rojo) · Tipo de orden (Mercado/Límite) con el Precio límite al lado SOLO si es Límite ·
+    Cantidad con «Máx.» y 25/50/75 % · [solo Comprar] Stop-loss y Take-profit · [solo Comprar] tarjeta **Calculadora de
+    riesgo plegable** (cabecera «▸ Calculadora de riesgo» con el % a la derecha; el cuerpo —% a arriesgar, «Sugerir stop», «Calcular
+    cantidad», nota del ATR— se despliega al pulsarla o al usar sus botones; empieza plegada) · [solo Vender] una nota que
+    dice dónde se editan los niveles («Esta posición tiene SL … Se cambian con «Editar SL/TP» en la tabla») · tarjeta de
+    **resumen** (precio de ejecución o límite, monto, comisión [+ deslizamiento], total — «Total a pagar»/«Recibirás» —, saldo
+    después, y «Riesgo hasta el stop» solo al comprar / «Ganancia estimada» solo al vender) · error de estimación en rojo ·
+    botón «Enviar orden de compra/venta» (cambia de texto y color según el lado).
+  - **Regla clave:** el ticket OCULTA lo que no aplica (no lo deshabilita). Los bloques se vuelven a empaquetar con
+    `pack(before=tarjeta_resumen)` para conservar el orden; los campos del resumen con `grid_remove()/grid()`; el precio
+    límite con `grid_remove()/grid()` (y el tipo ocupa todo el ancho cuando no hay límite).
+  - **Cantidad al cambiar de lado:** al pasar a Vender se propone la posición entera (`OperarController.cambiar_lado`); al volver
+    a Comprar, o si no hay posición, la caja se vacía.
+  - **Tablas (debajo del gráfico):** Posiciones abiertas (Cerrar posición, Editar SL/TP, Cerrar todas — botones DEBAJO de la
+    tabla, no dentro de las filas), Órdenes pendientes (Cancelar orden) e Historial (con Nota para los rechazos). Doble clic en una
+    posición abre SL/TP. Antes de enviar se valida y se pide confirmación.
+  - `OperarController` refresca todo cada 3 s con una sola llamada (incluido el patrimonio) y recalcula la estimación al escribir;
+    el gráfico lo maneja su propio `GraficoController`, al que `pantallas.py` conecta. **Orden de armado en `OperarView.__init__`:**
+    el ticket se crea ANTES que el centro, porque `_crear_tablas` termina llamando a `_actualizar_botones`, que lee
+    `_boton_enviar` (creado en el ticket).
 
 ### 4.4 Para agregar una pantalla
 **Formulario:**
@@ -354,7 +396,68 @@ periódicos se encadenan con `vista.programar` y comprueban `esta_viva()`.
 
 ---
 
-## 5. Convenciones
+## 5. Diseño de la interfaz (reglas decididas con el usuario)
+
+Esta sección resume lo acordado en el rediseño de Mercado y Operar (noviembre de 2026). Se sigue en toda pantalla nueva.
+
+### 5.1 Principios
+1. **Mostrar solo lo que aplica.** Lo que no se usa en un estado se OCULTA (`pack_forget`, `grid_remove`), no se deja
+   visible y deshabilitado (ejemplo: SL/TP y calculadora al vender; el precio límite con una orden a mercado).
+2. **Un componente, un solo aspecto.** Si dos pantallas muestran lo mismo (el gráfico en Mercado y en Operar), usan el mismo
+   componente con la misma estructura. El tamaño lo decide el contenedor, no el componente (no hay "modo compacto").
+3. **La acción de una pantalla va en la pantalla, no en el componente genérico.** «Operar AAPL» lo arma `MercadoView`
+   debajo del gráfico; `GraficoActivoView` no sabe nada de operar.
+4. **Lo que se agrupa, se agrupa; lo demás es texto y filas.** Tarjetas (`Card`) solo donde ordenan datos relacionados
+   (resumen de la orden, calculadora). Los datos sueltos son filas «etiqueta … valor».
+5. **Jerarquía por tamaño, no por gris.** Títulos y cifras importantes con `Fonts` (`HEADING`, `VALUE`); rótulos pequeños en
+   mayúsculas con `Fonts.SMALL`; todo en el color normal del tema.
+6. **Información que se lee de un vistazo en una franja** (saldo y patrimonio arriba en Operar), no repartida en tarjetas.
+7. **Botones de ocultar/mostrar un panel**: un botón con flecha («◀» / «▶») pegado al encabezado del panel que oculta; al
+   ocultarlo queda un riel angosto con la flecha contraria. Nunca texto vertical (Tk no rota texto), nunca en una esquina lejana.
+8. **Texto explicativo permanente, mínimo.** Si algo se explica en una leyenda fija que ocupa espacio (p. ej. «Hora local ·
+   cada vela = 1 hora») y la información ya se deduce, se quita.
+
+### 5.2 Colores (regla estricta)
+- **El texto de los widgets usa el color normal del tema** (un `ttk.Label` sin `foreground` ni `bootstyle`): blanco en un
+  tema oscuro y negro en uno claro, y cambia solo al cambiar el tema. NO se usa `foreground=Palette.TEXTO` ni
+  `bootstyle=Colors.MUTED` en textos (el gris `secondary` es demasiado oscuro y no se distingue).
+- **`Colors.MUTED` solo para bordes** (`FormView`, `Card`) y cosas apagadas (botones deshabilitados los apaga ttkbootstrap solo).
+- **`Palette` solo para lo que no es un widget:** el gráfico (matplotlib) y las etiquetas `alza`/`baja` de la tabla.
+- **Color solo cuando significa algo:** verde (`Colors.SUCCESS`) sube/ganancia/comprar; rojo (`Colors.DANGER`) baja/pérdida/
+  vender/error; amarillo (`Colors.WARNING`) desactualizado. Con `bootstyle=`, que se actualiza con el tema.
+- **Volver al color normal tras haber puesto un color:** `label.configure(style="TLabel")` (no `foreground`, que se queda fijo y
+  rompe los cambios posteriores de `bootstyle`).
+- **Botones toggle** (`outline-toolbutton`): su texto sale azulado por defecto; `styles.texto_normal(boton)` (se llama justo
+  después de crear cada toggle) lo deja en el color normal del tema. Lo usan los intervalos del gráfico y las pestañas de la lista.
+- **Resaltado azul de un `Combobox` de solo lectura al elegir:** `SelectField.al_cambiar` ya hace `selection_clear()`.
+
+### 5.3 Estructuras de referencia
+- **Encabezado de un activo** (gráfico): izquierda, `AAPL` en `HEADING` y debajo «Apple · Acción · Yahoo Finance» en `SUBTITLE`;
+  derecha, `356,27 USD` en `HEADING` y debajo `+0,39 %` (verde/rojo, sin triángulo) y `(del día)` en `SMALL`. Debajo, una línea
+  `SMALL` con máx./mín./volumen/actualizado.
+- **Barra del gráfico:** intervalos (toggles) a la izquierda; a la derecha «120 velas ▾» y «Indicadores ▾» (menú de casillas).
+- **Operar:** franja arriba (Saldo disponible · Patrimonio), gráfico + tablas a la izquierda, ticket a la derecha (ver 4.3).
+- **Mercado:** título, lista con encabezado «Activos ◀» a la izquierda; gráfico a la derecha con la barra «Operar AAPL» debajo.
+- **Resumen de la orden:** etiqueta a la izquierda, valor a la derecha, un separador antes del total; el total en `VALUE`.
+
+### 5.4 Qué NO se puede hacer en ttkbootstrap/tkinter (decirlo antes de proponerlo)
+- **Esquinas redondeadas:** no existen; todo es rectangular.
+- **Widgets dentro de las celdas de un `Treeview`** (botones por fila): no; los botones van debajo de la tabla.
+- **Color por celda en un `Treeview`:** no; el color (`alza`/`baja`) es de TODA la fila. Colorear solo una columna exigiría
+  reemplazar la tabla por una lista armada a mano (descartado por ahora).
+- **Texto rotado (vertical):** no.
+- **Íconos:** dependen de la fuente de Windows; se usan solo los símbolos ya probados («◀», «▶», «▾», «▸»), nunca íconos nuevos.
+- **`ttk.Notebook` para las secciones de la app:** no (mantendría todas vivas con sus refrescos); las secciones las maneja el Navegador.
+- **Cambiar fuente o colores del tema:** no sin que él lo pida (Helvetica, `darkly`).
+- **Un `ttk.Button` más angosto que su relleno interno:** no baja de cierto ancho; para algo muy delgado usar un `tk.Label` con clic.
+
+### 5.5 Proceso
+Cambio visual = **mockup primero** (varias propuestas si hay dudas; el usuario elige o mezcla), luego código en un zip
+acumulativo. Cada propuesta debe decir qué es viable y qué no (5.4) y qué archivos tocaría.
+
+---
+
+## 6. Convenciones
 
 **Nombres.** Carpetas, archivos y clases **estructurales en inglés** (`usuario_entity.py`, `UsuarioService`,
 `LoginController`, `Database`, `Session`, `Navegador`). Nombres **de negocio, métodos, parámetros y variables en español**
@@ -393,7 +496,7 @@ lo que hace: `autenticar` verifica y no inicia sesión; el controlador es quien 
 
 ---
 
-## 6. Decisiones de diseño (no reabrir sin motivo)
+## 7. Decisiones de diseño (no reabrir sin motivo)
 
 1. **Controladores como intermediarios** y vistas pasivas; el servicio no sabe que existen pantallas. Permite probar los controladores sin ventanas.
 2. **Validaciones en el servicio, por campo y reutilizables** (`_error_nombre`, `_error_email`, `_error_password`, `_error_confirmacion`...), combinadas por caso de uso; `lanzar_si_hay_errores` (en `services/validacion.py`) avisa de **todos** los problemas a la vez. **Sin archivo externo de reglas.** (`UsuarioService` conserva su propia copia del método; se unifica cuando se renombre.)
@@ -416,46 +519,44 @@ lo que hace: `autenticar` verifica y no inicia sesión; el controlador es quien 
 19. **Claves `id_<entidad>`** en todas las tablas.
 20. **Servicios por tema, y se separan en dos archivos solo cuando un tema tiene una parte de usuario y otra de administración** (`UsuarioService` + `UsuarioAdminService`, `MercadoService` + `ActivoAdminService`, etc.). No hay un servicio por rol. Las funciones nuevas de usuario (perfil, cambiar contraseña...) irán en `UsuarioService`. **Renombrar `UsuarioService` a `AuthService` queda aplazado hasta terminar el proyecto.**
 21. **Migraciones:** descartadas por ahora; la base real se ajusta a mano según se necesite (con scripts SQL sueltos como `mercado_actualizar.sql` u `operar_fase2.sql`, que se pueden borrar después de usarlos).
-22. **El esquema SQL es orientativo,** salvo las tablas que ya existen de verdad (sección 7). El código y el usuario mandan sobre `schema.sql`.
+22. **El esquema SQL es orientativo,** salvo las tablas que ya existen de verdad (sección 8). El código y el usuario mandan sobre `schema.sql`.
 23. **Mercado es una sola pantalla de panel dividido** (lista + gráfico, ocultable y con borde arrastrable). No existe una "ficha" aparte. El administrador no opera, pero ve Mercado.
-24. **Tarjetas de resumen: solo donde agrupan datos y mejoran la pantalla** (`Card`; hoy, el ticket de Operar). Para el resto, texto, filas o tablas.
+24. **Tarjetas de resumen: solo donde agrupan datos y mejoran la pantalla** (`Card`; hoy, la calculadora y el resumen de la orden en Operar). Para el resto, texto, filas o tablas.
 25. **Las fuentes de datos son datos, no código fijo:** tabla `fuentes_datos`; cada activo apunta a una fuente; el administrador elige la fuente al agregar un activo, puede cambiarla (se borran sus velas y su cotización para no mezclar orígenes) y puede habilitar o deshabilitar una fuente entera. Una fuente nueva = su cliente en `clients/` + su registro en `composition.py` + una fila en `fuentes_datos`.
 26. **Tiempo real por consulta a la base** (ver sección 4.3); la ingesta es tolerante: un fallo no frena a los demás.
 27. **Indicadores en Python puro** (`analisis/`), parámetros en `domain/reglas/indicadores.py`, dibujo en `candle_render.py`.
 28. **El Inicio del usuario se deja para el final** (hoy es una pantalla de bienvenida provisional) para diseñarlo cuando todas las funcionalidades existan.
-29. **Contraseña olvidada = contraseña temporal entregada por el admin** (no hay correo ni preguntas secretas): se muestra
-    una sola vez, deja de valer la anterior y el usuario debe cambiarla al entrar (columna `usuarios.debe_cambiar_password`).
-30. **Ritmo de las fuentes: fijo en el código por ahora** (`segundos_entre_*` de cada cliente). Hacerlo editable desde admin
-    está pendiente de decisión (ver sección 10).
-31. **Los formularios (login, registro, cambio de contraseña) van dentro de una tarjeta con borde y fondo distinto al de la
-    ventana** (`FormView`), para que no parezcan ocupar toda la pantalla al agrandarla.
-32. **Agregar y editar un activo (admin) son ventanas emergentes,** no formularios sobre la tabla (`iu/admin/activo_dialogs.py`):
-    menos cosas encima de la tabla. Doble clic en una fila abre la edición.
+29. **Contraseña olvidada = contraseña temporal entregada por el admin** (no hay correo ni preguntas secretas): se muestra una sola vez, deja de valer la anterior y el usuario debe cambiarla al entrar (columna `usuarios.debe_cambiar_password`).
+30. **Ritmo de las fuentes: fijo en el código por ahora** (`segundos_entre_*` de cada cliente). Hacerlo editable desde admin está pendiente de decisión (ver sección 11).
+31. **Los formularios (login, registro, cambio de contraseña) van dentro de una tarjeta con borde y fondo distinto al de la ventana** (`FormView`), para que no parezcan ocupar toda la pantalla al agrandarla.
+32. **Agregar y editar un activo (admin) son ventanas emergentes,** no formularios sobre la tabla (`iu/admin/activo_dialogs.py`): menos cosas encima de la tabla. Doble clic en una fila abre la edición.
 33. **Entrega de cambios: siempre un `.zip` con los archivos nuevos y modificados, sin código para copiar y pegar** (sección 2, punto 3).
 34. **Operar sin apalancamiento, sin margen y sin cortos:** el saldo es dinero real del simulador; vender solo cierra o reduce lo que se tiene.
-35. **Mercado explora y Operar ejecuta (opción C):** Mercado conserva su lista y su gráfico completo; Operar tiene su propio gráfico compacto y un selector de activo. «Operar este activo» (Mercado) abre Operar con ese activo. El administrador no ve Operar ni el botón.
+35. **Mercado explora y Operar ejecuta:** Mercado conserva su lista y su gráfico completo; Operar tiene su propio gráfico (el mismo componente) y un selector de activo. «Operar AAPL» (Mercado) abre Operar con ese activo. El administrador no ve Operar ni el botón.
 36. **Stop-loss y take-profit viven en la posición** (no como órdenes hijas): más simples, sin sincronizar cantidades ni cancelar parejas. Contrapartida: un solo SL y un solo TP por activo.
 37. **Las órdenes límite no reservan saldo:** se valida al enviar y al ejecutar; si falla al ejecutar, queda `rechazada` con motivo. (Reservar exigiría una columna de saldo reservado.) Las órdenes rechazadas SOLO se guardan cuando fallan al ejecutarse; un rechazo al enviarla es un error en pantalla.
-38. **El mercado cerrado no se controla (todavía):** una orden a mercado, un límite o un stop-loss se evalúa contra el último precio guardado, aunque el mercado esté cerrado o el precio esté viejo. Queda para más tarde (ver sección 10).
+38. **El mercado cerrado no se controla (todavía):** una orden a mercado, un límite o un stop-loss se evalúa contra el último precio guardado, aunque el mercado esté cerrado o el precio esté viejo. Queda para más tarde (ver sección 11).
 39. **Deslizamiento opcional por cuenta** (`deslizamiento_pct`, 0 por defecto), solo para mercado y stop-loss.
 40. **Operar pide todo su estado en una sola llamada** (`obtener_estado`) por el límite de 5 conexiones del pool.
 41. **La calculadora de riesgo arriesga un % del patrimonio** (saldo + posiciones), con el stop a 2 ATR diarios; cuenta comisiones de compra y venta, no deslizamiento. Es solo para compras.
 42. **Las ventanas emergentes comparten la base `Dialogo`** (components) en vez de que cada módulo tenga la suya.
-43. **La moneda de un activo NO se edita** (no hay función de conversión y no tiene sentido cambiarla activo por activo): se
-    asigna al agregarlo (USD; en divisas de Yahoo, la segunda moneda del par) y `ActivoAdminService.editar(actor, id, nombre)`
-    solo cambia el nombre. Más adelante se añadirá una **moneda de la aplicación** configurable, con cambio de moneda según
-    tasa de cambio.
-44. **Los avisos de éxito o error de las secciones del panel son diálogos,** no un texto fijo en la pantalla (un "guardado" o un
-    error no debe quedarse escrito cuando ya no importa). Los estados que se repiten en cada refresco van como texto en la
-    pantalla; los fallos de los refrescos periódicos se avisan una sola vez (`_avisar_una_vez`). Los formularios conservan el
-    error bajo cada campo y el error general en el propio formulario. Ver sección 4.3 ("Avisos al usuario").
+43. **La moneda de un activo NO se edita** (no hay función de conversión y no tiene sentido cambiarla activo por activo): se asigna al agregarlo (USD; en divisas de Yahoo, la segunda moneda del par) y `ActivoAdminService.editar(actor, id, nombre)` solo cambia el nombre. Más adelante se añadirá una **moneda de la aplicación** configurable, con cambio de moneda según tasa de cambio.
+44. **Los avisos de éxito o error de las secciones del panel son diálogos,** no un texto fijo en la pantalla (un "guardado" o un error no debe quedarse escrito cuando ya no importa). Los estados que se repiten en cada refresco van como texto en la pantalla; los fallos de los refrescos periódicos se avisan una sola vez (`_avisar_una_vez`). Los formularios conservan el error bajo cada campo y el error general en el propio formulario. Ver sección 4.3 ("Avisos al usuario").
+45. **El texto de los widgets usa el color normal del tema** (sin `foreground` ni `bootstyle`); `Colors.MUTED` solo para bordes; `Palette` solo para el gráfico y la tabla; color solo cuando significa algo; los toggles se corrigen con `styles.texto_normal`. Ver 5.2.
+46. **El ticket de Operar oculta lo que no aplica** (no lo deshabilita): SL/TP, calculadora y «Riesgo hasta el stop» solo al comprar; la nota de SL/TP y «Ganancia estimada» solo al vender; el precio límite solo con una orden límite. La calculadora es plegable (empieza plegada). Al vender se propone la posición entera.
+47. **Disposición de Operar:** franja superior con Saldo y Patrimonio; gráfico y tablas a la izquierda; ticket a la derecha. La tarjeta de la cuenta desapareció: queda una línea «Tienes N ACTIVO · P&L». El detalle de la posición (precio medio, P&L %, SL/TP) vive en la tabla de posiciones.
+48. **`GraficoActivoView` es un único componente** para Mercado y Operar (sin `compacto`); el tamaño lo decide el contenedor. Indicadores en un menú «Indicadores ▾» (no interruptores). Encabezado en dos columnas con el detalle y la variación debajo; sin triángulo en la variación.
+49. **Eje horizontal del gráfico con hora o fecha** en cada marca (ver 4.3); sin leyenda explicativa bajo el eje. La línea de datos de la vela lleva fecha (y hora si es intradía).
+50. **Mercado:** «Operar AAPL» va debajo del gráfico (en `MercadoView`, verde sólido, a la derecha); el botón «◀» de ocultar la lista va en el encabezado «Activos» de la lista y, oculta, queda un riel con «▶»; la lista tiene columna «Nombre» (se ordena de la A a la Z).
+51. **Los cambios visuales se validan primero con mockups** y se entregan en un `.zip` acumulativo (sección 2, puntos 3 y 9; sección 5.5). Todo diseño debe ser realizable con ttkbootstrap (5.4).
+52. **El menú lateral del shell se queda como está.** Se evaluó una barra de íconos y pestañas arriba (no caben los módulos futuros ni el menú de admin con textos largos); se descartó. Si más adelante se quiere ahorrar ancho, la opción acordada como válida es una barra lateral **ocultable** (mismo patrón ◀/▶ de 5.1).
 
 ---
 
-## 7. Base de datos (PostgreSQL 9.3)
+## 8. Base de datos (PostgreSQL 9.3)
 
 **`database/schema.sql` es una GUÍA de lo que la base podría llegar a tener, no la fuente de verdad.** La base real
-tiene hoy estas tablas y se irá ajustando por módulo:
+tiene hoy estas tablas y se irá ajustando por módulo (hay un volcado en `database/simultradia_esquema.sql`):
 
 - `usuarios` (recortada: sin `avatar_url`, pero con `debe_cambiar_password`) y `cuentas_simuladas` (con `comision_pct`,
   `deslizamiento_pct`, `es_replay`, `activa`, `reiniciada_en`; Operar usa las cuentas con `activa` y `NOT es_replay`;
@@ -498,20 +599,20 @@ PostgreSQL 9.3, claves `id_<entidad>` y los tipos de abajo.
 
 ---
 
-## 8. Pruebas
+## 9. Pruebas
 
 - Desde la raíz: `python -m unittest discover -s tests -t . -v` (con `pip install -e .` hecho). No necesitan PostgreSQL, ventanas ni internet.
-- Estructura: `tests/fakes.py` (falsos compartidos) y subcarpetas `core/`, `services/`, `iu/`, `analisis/`, `clients/`, cada una con `__init__.py`; se importa `from tests.fakes import ...`.
+- Estructura: `tests/fakes.py` (falsos compartidos) y subcarpetas `core/`, `services/`, `iu/`, `analisis/`, `clients/`, `domain/`, cada una con `__init__.py`; se importa `from tests.fakes import ...`.
 - **Servicios:** `DatabaseFalsa`, `RepositorioFalso`, `CuentaRepositorioFalso`, `RepoActivoFalso`, `RepoPrecioFalso`, `RepoFuenteFalso`, `UsuarioRepoAdminFalso`, `ClienteMercadoFalso` (hace de una fuente y declara sus tipos, formato de ticker y ritmo).
-- **Controladores:** `VistaFalsa` (formularios), `VistaPanelFalsa` (secciones; anota lo que le ordenan, y cada diálogo de error que se habría abierto en `errores_mostrados`), `NavegadorFalso`, `ServicioFalso`, `ServicioGenerico` (responde cualquier método con lo que se le prepare) y una `Session()` propia por prueba. `ejecutar_en_hilo` se reemplaza con `mock.patch(...)` en `simultradia.iu.base.form_controller` o `simultradia.iu.base.panel_controller` (en el acto, o diferido con `EjecutorDiferido`). `tests/iu/test_panel_controller.py` prueba el aviso único de los refrescos periódicos.
+- **Controladores:** `VistaFalsa` (formularios), `VistaPanelFalsa` (secciones; anota lo que le ordenan —incluidos `mostrar_patrimonio` y `limpiar_cantidad`—, y cada diálogo de error que se habría abierto en `errores_mostrados`), `NavegadorFalso`, `ServicioFalso`, `ServicioGenerico` (responde cualquier método con lo que se le prepare) y una `Session()` propia por prueba. `ejecutar_en_hilo` se reemplaza con `mock.patch(...)` en `simultradia.iu.base.form_controller` o `simultradia.iu.base.panel_controller` (en el acto, o diferido con `EjecutorDiferido`). `tests/iu/test_panel_controller.py` prueba el aviso único de los refrescos periódicos. `tests/iu/test_operar_lado.py` prueba el patrimonio y la cantidad al cambiar de lado; `tests/iu/test_lista_nombre.py`, el orden por Nombre.
 - **Navegador:** `VentanaFalsa`, `PantallaFalsa`, `ShellFalso`.
-- **Dominio, análisis, formato y gráfico:** puro Python; las reglas de operar en `tests/domain/`; el dibujo (`candle_render`) se prueba con una `Figure` de matplotlib y `savefig`. Las pruebas del cliente de Yahoo usan tablas de pandas armadas a mano (se saltan si pandas no está).
+- **Dominio, análisis, formato y gráfico:** puro Python; las reglas de operar en `tests/domain/`; el dibujo (`candle_render`) se prueba con una `Figure` de matplotlib y `savefig`; las marcas del eje horizontal (`indices_eje_x`, `etiquetas_eje_x`) en `tests/iu/test_candle_etiquetas.py`. Las pruebas del cliente de Yahoo usan tablas de pandas armadas a mano (se saltan si pandas no está).
 - **Las vistas de tkinter NO se prueban** (nadie las ejecuta fuera de la app): un error de armado solo aparece al abrir la pantalla.
 - **Entorno de Claude:** sin tkinter, ttkbootstrap, psycopg2, ccxt, yfinance ni red. Se verifica con módulos simulados (stubs) en una carpeta temporal y `PYTHONPATH`. Lo visual y las conexiones reales solo los puede comprobar el usuario.
 
 ---
 
-## 9. Qué evitar
+## 10. Qué evitar
 
 Archivos de "reglas" o "validaciones" externos · singletons globales · SQL fuera de repositorios · lógica en
 vistas · tkinter en servicios o en `core` · componentes como funciones · `float` para dinero · ajustes, estilos o
@@ -522,32 +623,48 @@ llamar a una API externa con una conexión de base de datos abierta · mezclar v
 dibujar velas planas con el mercado cerrado · una consulta SQL distinta por cada combinación de filtros cuando hay
 pocas filas · un servicio por rol en lugar de por tema · **entregar código para copiar y pegar en lugar del `.zip`** ·
 **reutilizar el nombre de una variable para dos widgets distintos en un método que arma una pantalla** (y luego devolver
-la equivocada) · lanzar varias consultas a la vez desde una pantalla que refresca (el pool es de 5) · escribir en la
-base antes de terminar de validar (una orden rechazada no debe dejar nada a medias) · bloquear en distinto orden (siempre
-cuenta primero, luego orden) · apalancamiento, margen o posiciones cortas · **mensajes de éxito o error de una sección como texto fijo en la
-pantalla (van en diálogo)** · **un diálogo de error en cada vuelta de un refresco periódico** · **editar la moneda de un
-activo suelto**.
+la equivocada) · **usar en `__init__` un widget que se crea en un método que se llama después** · lanzar varias consultas
+a la vez desde una pantalla que refresca (el pool es de 5) · escribir en la base antes de terminar de validar (una orden
+rechazada no debe dejar nada a medias) · bloquear en distinto orden (siempre cuenta primero, luego orden) · apalancamiento,
+margen o posiciones cortas · **mensajes de éxito o error de una sección como texto fijo en la pantalla (van en diálogo)** ·
+**un diálogo de error en cada vuelta de un refresco periódico** · **editar la moneda de un activo suelto** · **texto de
+widgets con `foreground=Palette.TEXTO` o `bootstyle=Colors.MUTED`** · **campos que no aplican deshabilitados en vez de
+ocultos** · **una versión "compacta" de un componente en lugar de dejar que el contenedor decida el tamaño** · **botones
+de una pantalla metidos dentro de un componente genérico** · **texto vertical o leyendas fijas que gastan espacio** ·
+**proponer diseños que ttkbootstrap no puede dibujar** (5.4) · **escribir código de un rediseño antes de que el usuario
+apruebe el mockup**.
 
 ---
 
-## 10. Estado actual y pendientes
+## 11. Estado actual y pendientes
 
 **Hecho**
 - Login, registro, shell con menú lateral y sección de Inicio provisional. Formularios dentro de una tarjeta con borde.
-- **Mercado:** 30 activos de 6 categorías, lista filtrable y ordenable, gráfico de velas casi en tiempo real con
-  intervalos 15 m / 1 h / 4 h / 1 d / 1 sem, cantidad de velas elegible e indicadores SMA, EMA, Bollinger, volumen,
-  RSI y MACD. Botón «Operar este activo».
+- **Mercado:** 30 activos de 6 categorías, lista filtrable y ordenable (con columna Nombre), gráfico de velas casi en tiempo
+  real con intervalos 15 m / 1 h / 4 h / 1 d / 1 sem, cantidad de velas elegible e indicadores SMA, EMA, Bollinger, volumen,
+  RSI y MACD (menú «Indicadores ▾»). Eje horizontal con hora/fecha. «Operar AAPL» debajo del gráfico. Lista ocultable (◀/▶).
 - **Datos:** worker con ingesta por fuente (Binance y Yahoo Finance), cada una a su ritmo.
 - **Administración:** Usuarios (buscar y filtrar, activar/desactivar, restablecer contraseña con una temporal), Activos
   (buscar y filtrar, agregar y editar el nombre en ventanas emergentes, probar ticker, habilitar, probar y cambiar fuente) e
   Ingesta de datos (estado, habilitar fuentes, probar conexión, actualizar una fuente o todo).
-- **Operar (fases 1 a 3):** ticket con estimación en vivo, atajos de cantidad, órdenes a mercado y límite, stop-loss y
-  take-profit (al comprar o editándolos en la posición), posiciones con P&L en vivo, cerrar una o todas, órdenes
-  pendientes con cancelación, historial con estados y motivos de rechazo, calculadora de riesgo (stop a 2 ATR y cantidad
-  por % del patrimonio), gráfico compacto, y el job del worker que ejecuta lo pendiente.
+- **Operar (fases 1 a 3 + rediseño visual):** ticket a la derecha con estimación en vivo, atajos de cantidad, órdenes a
+  mercado y límite, stop-loss y take-profit (al comprar o editándolos en la posición), calculadora de riesgo plegable (stop a
+  2 ATR y cantidad por % del patrimonio), campos que se ocultan según Comprar/Vender, franja con saldo y patrimonio,
+  posiciones con P&L en vivo, cerrar una o todas, órdenes pendientes con cancelación, historial con estados y motivos de
+  rechazo, y el job del worker que ejecuta lo pendiente.
+- **Rediseño visual (noviembre de 2026):** colores de texto normales del tema, componente de gráfico unificado, eje X con
+  hora/fecha, ticket sin campos deshabilitados, Mercado con botón de operar y lista ocultable.
+
+**Pendiente del rediseño visual (propuestas hechas, sin decidir o sin aplicar)**
+- **Cantidad con 10 decimales** (`19,5451961105` al usar Máx. o %): redondear solo al calcular con Máx./% no es seguro con activos baratos; hay que decidir cuántos decimales según el precio.
+- **Subtítulo de Mercado** «30 activos · actualizado hace…» en la fila del título (hoy sigue como pie de la lista).
+- **Modo reducido de la lista** de Mercado (solo ticker y variación, ~110 px) como alternativa a ocultarla del todo: propuesto, no elegido.
+- **Color solo en la columna «Var. %»** de la lista: exige reemplazar el `Treeview` por una lista propia (descartado por ahora).
+- Verificar en pantalla: `texto_normal` en los toggles (si siguen azulados, hay que cambiar el enfoque), etiquetas de dos líneas del eje X sin cortarse, ancho del ticket de Operar (340 px) con la ventana mínima.
+- Barra lateral **ocultable** (opcional, ver decisión 52).
 
 **Pendiente de Operar (mejoras)**
-- **Mercado cerrado:** horarios y feriados (decisión 39). Idea acordada: una función pura `mercado_abierto(tipo, ahora)` en
+- **Mercado cerrado:** horarios y feriados (decisión 38). Idea acordada: una función pura `mercado_abierto(tipo, ahora)` en
   `domain/reglas/horarios.py` (cripto siempre; divisas lun-vie; acciones/ETF/bonos en horario de Nueva York, que necesita
   `backports.zoneinfo` en Python 3.8); si está cerrado, `OperarService` rechaza la orden. Hoy también faltan precios
   "viejos": si el worker se detiene, Operar usa el último precio guardado sin avisar.
@@ -555,7 +672,6 @@ activo suelto**.
 - Al cerrar una posición, sus órdenes de venta pendientes no se cancelan solas: se rechazan al dispararse.
 - Orden de compra por **monto** en dinero (hoy solo por cantidad); más de un SL/TP por activo; stop de compra y stop-límite (el tipo existe en la base, sin uso).
 - Reservar saldo para las órdenes límite (decisión 37).
-- **Avisos:** errores y confirmaciones de las secciones en diálogos (decisión 44); la moneda por activo ya no se edita (decisión 43).
 
 **Pendiente de administración (próxima mejora)**
 - Usuarios: **cambiar el rol** (decidido a medias: ver más abajo), reiniciar la cuenta (ahora que existen las tablas de operar,
@@ -576,12 +692,12 @@ activo suelto**.
 **Portafolio** (patrimonio, rentabilidad vs capital inicial, drawdown, % de aciertos, evolución del capital con
 `snapshots_portafolio`, ganancia por operación cerrada con `operaciones_cerradas`; las posiciones abiertas y su P&L ya viven
 en Operar, así que Portafolio es el análisis) → Watchlist → noticias → IA → Backtesting → Replay → Coach → Glosario →
-**Inicio** (al final).
+**Inicio** (al final). Cada pantalla nueva sigue la sección 5 (mockup primero).
 Más adelante: **moneda de la aplicación** (configuración + cambio de moneda con tasa de cambio).
 
 **Deuda técnica conocida**
 - Renombrar `UsuarioService` a `AuthService` y usar `validacion.py` en lugar de su copia de `_lanzar_si_hay_errores` (aplazado al final del proyecto).
 - `yfinance` no se ha probado contra internet real; Yahoo cambia y bloquea con cierta frecuencia. Si falla, el worker lo registra y sigue con Binance.
 - Binance puede estar bloqueado en algunos países; si no hay datos, revisar el log del worker.
-- Lo visual de la interfaz nunca lo ha visto Claude: lo valida el usuario ejecutando la app (la tarjeta de los formularios, las ventanas emergentes, y en Operar el ticket con scroll, el reparto del alto, el menú «Indicadores» y las pestañas). Si algo se ve mal, el usuario pasa una captura.
+- Lo visual de la interfaz nunca lo ha visto Claude: lo valida el usuario ejecutando la app (la tarjeta de los formularios, las ventanas emergentes, el ticket con scroll, el reparto del alto, el riel de la lista de Mercado y los toggles). Si algo se ve mal, el usuario pasa una captura.
 - Los activos en otra moneda (USDJPY=X, USDCAD=X, ^GDAXI, ^N225) no se pueden operar hasta que haya conversión.

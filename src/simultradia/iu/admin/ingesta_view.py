@@ -38,13 +38,13 @@ class IngestaView(PanelView):
         for fila, (clave, titulo) in enumerate((("ultima", "Último precio recibido"),
                                                 ("activos", "Activos habilitados"),
                                                 ("velas", "Velas guardadas"))):
-            ttk.Label(resumen, text=titulo, font=Fonts.BODY, bootstyle=Colors.MUTED
+            ttk.Label(resumen, text=titulo, font=Fonts.BODY
                       ).grid(row=fila, column=0, sticky="w", padx=(0, Spacing.LG), pady=2)
             self._valores[clave] = ttk.Label(resumen, text="—", font=Fonts.BODY)
             self._valores[clave].grid(row=fila, column=1, sticky="w", pady=2)
 
         ttk.Label(
-            self, font=Fonts.SMALL, bootstyle=Colors.MUTED, justify="left",
+            self, font=Fonts.SMALL, justify="left",
             text="El proceso «python worker.py» mantiene los datos al día (cada fuente a su ritmo). Si no está\n"
                  "corriendo, puedes actualizar a mano con el botón de abajo; la primera vez descarga todo\n"
                  "el historial y puede tardar varios minutos.",

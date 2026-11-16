@@ -8,6 +8,10 @@ la app se edita un solo lugar: este archivo.
   - Cambiar el tamaño o peso de un rol     ->  Fonts._ROLES
   - Cambiar un color o un espaciado        ->  Colors / Spacing
   - Cambiar los colores del gráfico/tabla  ->  Palette
+
+El TEXTO de los widgets (labels, rótulos, notas) NO lleva color propio: usa el color normal del tema, que
+cambia solo al cambiar de tema (claro u oscuro). Solo se pone color a lo que significa algo (verde, rojo,
+amarillo, con `bootstyle=Colors.X`).
 """
 import tkinter.font as tkfont
 
@@ -17,7 +21,7 @@ import ttkbootstrap as ttk
 class Colors:
     """Nombres de color de ttkbootstrap (se usan con bootstyle=Colors.X)."""
     PRIMARY = "primary"
-    MUTED = "secondary"
+    MUTED = "secondary"              # gris oscuro: SOLO para bordes y cosas apagadas, nunca para texto que se debe leer
     SUCCESS = "success"
     DANGER = "danger"
     WARNING = "warning"
@@ -26,7 +30,7 @@ class Colors:
 
 class Palette:
     """Colores y tamaños para lo que NO es un widget de ttkbootstrap: el gráfico (matplotlib)
-    y las etiquetas de la tabla. Van acordes al tema oscuro `darkly`."""
+    y las etiquetas de la tabla. Van acordes al tema oscuro `darkly`. No se usa en widgets."""
     ALZA = "#00bc8c"                 # verde: sube
     BAJA = "#e74c3c"                 # rojo: baja
     FONDO = "#222222"
@@ -44,6 +48,7 @@ class Palette:
 class ButtonStyle:
     """Aspectos de botón de ttkbootstrap."""
     PRIMARY = "primary"
+    SUCCESS = "success"              # botón verde sólido: la acción principal de una pantalla (p. ej. «Operar»)
     LINK = "link"                    # parece un enlace de texto
     DANGER_OUTLINE = "danger-outline"
     SUCCESS_OUTLINE = "success-outline"
@@ -114,3 +119,11 @@ class Fonts:
         estilo = ttk.Style()
         for widget in ("TButton", "TCheckbutton", "TRadiobutton"):
             estilo.configure(widget, font=cls.BODY)
+
+
+def texto_normal(boton) -> None:
+    """Los botones tipo toggle (`outline-toolbutton`) pintan su texto con el color primario (azulado).
+    Esto lo deja en el color normal del tema, que cambia solo con el tema. Se llama una vez por botón,
+    justo después de crearlo: el estilo es compartido, así que afecta a todos los toggles de ese tipo."""
+    estilo = ttk.Style()
+    estilo.configure(boton.cget("style"), foreground=estilo.colors.fg)

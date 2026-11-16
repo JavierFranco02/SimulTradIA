@@ -16,7 +16,7 @@ from simultradia.iu.admin.activo_dialogs import AgregarActivoDialog, EditarActiv
 from simultradia.iu.base.panel_view import PanelView
 from simultradia.iu.components import ActionButton, DataTable, SelectField
 from simultradia.iu.formato import TIPO_SINGULAR, hace, precio
-from simultradia.iu.styles import ButtonStyle, Colors, Fonts, Spacing
+from simultradia.iu.styles import ButtonStyle, Fonts, Spacing
 
 _COLUMNAS = (
     ("ticker", "Ticker", 110, "w"),
@@ -76,8 +76,7 @@ class ActivosAdminView(PanelView):
         self._boton_fuente.configure(state="disabled")
         self._fuente_nueva = SelectField(barra, None, ancho=14)
         self._fuente_nueva.pack(side="right", padx=(0, Spacing.SM))
-        ttk.Label(barra, text="Pasar a:", font=Fonts.BODY,
-                  bootstyle=Colors.MUTED).pack(side="right", padx=(0, Spacing.SM))
+        ttk.Label(barra, text="Pasar a:", font=Fonts.BODY).pack(side="right", padx=(0, Spacing.SM))
         self._boton_probar_fuente = ActionButton(barra, "Probar", self._pulsar_probar_fuente,
                                                  estilo=ButtonStyle.LINK)
         self._boton_probar_fuente.pack(side="right", padx=(0, Spacing.SM))
@@ -90,7 +89,7 @@ class ActivosAdminView(PanelView):
         ttk.Label(self, text="Doble clic en un activo para editarlo. Un activo deshabilitado deja de actualizarse "
                              "y de aparecer en Mercado. Al cambiar su fuente se borran sus velas guardadas y "
                              "se descargan de nuevo.",
-                  font=Fonts.SMALL, bootstyle=Colors.MUTED).pack(anchor="w", pady=(Spacing.SM, 0))
+                  font=Fonts.SMALL).pack(anchor="w", pady=(Spacing.SM, 0))
 
     def vincular_acciones(self, al_agregar: Callable[[], None],
                           al_cambiar_estado: Callable[[int, bool], None],
