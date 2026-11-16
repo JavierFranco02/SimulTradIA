@@ -28,8 +28,7 @@ class FormView(ttk.Frame):
         tarjeta.pack()
         ttk.Label(tarjeta, text=titulo, font=Fonts.TITLE, bootstyle=Colors.PRIMARY).pack()
         if subtitulo:
-            ttk.Label(tarjeta, text=subtitulo, font=Fonts.SUBTITLE,
-                      bootstyle=Colors.MUTED).pack(pady=(2, Spacing.LG))
+            ttk.Label(tarjeta, text=subtitulo, font=Fonts.SUBTITLE).pack(pady=(2, Spacing.LG))
         self._cuerpo = ttk.Frame(tarjeta)   # aquí se agregan los campos y botones
         self._cuerpo.pack(fill="x")
 

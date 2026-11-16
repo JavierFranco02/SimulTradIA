@@ -45,8 +45,8 @@ class ListaController(PanelController):
         if columna == self._orden:
             self._descendente = not self._descendente
         else:
-            # los números interesan de mayor a menor; el nombre, de la A a la Z
-            self._orden, self._descendente = columna, columna != "ticker"
+            # los números interesan de mayor a menor; el ticker y el nombre, de la A a la Z
+            self._orden, self._descendente = columna, columna not in ("ticker", "nombre")
         self._pedir()
 
     # --------------------------------------------------------------- interno

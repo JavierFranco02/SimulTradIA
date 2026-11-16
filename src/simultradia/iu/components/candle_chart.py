@@ -4,8 +4,9 @@
     grafico.establecer_datos(datos, IntervaloVela.H1)             # datos = DatosGrafico
     grafico.establecer_opciones(OpcionesGrafico(visibles=60, rsi=True))
 
-Al pasar el mouse sobre una vela, arriba a la izquierda se leen su apertura, máximo, mínimo,
-cierre y volumen. Cada actualización redibuja todo: con unos cientos de velas es rápido.
+Al pasar el mouse sobre una vela, arriba a la izquierda se leen su fecha (y hora, si es de menos de un
+día), apertura, máximo, mínimo, cierre y volumen. Cada actualización redibuja todo: con unos cientos de
+velas es rápido.
 """
 import ttkbootstrap as ttk
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -59,5 +60,5 @@ class CandleChart(ttk.Frame):
         indice = int(round(evento.xdata))
         if 0 <= indice < len(dibujo.velas) and indice != self._indice_texto:
             self._indice_texto = indice
-            dibujo.texto.set_text(texto_de_vela(dibujo.velas[indice]))
+            dibujo.texto.set_text(texto_de_vela(dibujo.velas[indice], dibujo.con_hora))
             self._lienzo.draw_idle()

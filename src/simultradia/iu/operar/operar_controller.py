@@ -3,6 +3,7 @@
   - Cada 3 s pide TODO el estado de una vez (resumen del activo elegido, posiciones, órdenes pendientes e
     historial): así el P&L sigue al precio y se ve cuándo el worker ejecuta una orden límite o un stop-loss.
   - La estimación se recalcula al escribir, al cambiar de lado o de tipo y con cada precio nuevo.
+  - Al pasar a Vender se precarga la cantidad con la posición entera; al volver a Comprar, la caja se vacía.
   - La calculadora de riesgo: «Sugerir stop» pide el ATR (lee velas: va en segundo plano) y «Calcular cantidad»
     es un cálculo con lo que ya se sabe.
   - Antes de enviar una orden se valida y se pide confirmación; mientras se envía no se acepta otra.
@@ -10,6 +11,7 @@
   - El gráfico es de GraficoController: aquí solo se le avisa qué activo se eligió.
 """
 from simultradia.core.exceptions import DatosInvalidos, ErrorAplicacion
+from simultradia.domain.enums import LadoOrden
 from simultradia.iu.base.panel_controller import PanelController
 
 _CADA_MS = 3000
@@ -29,6 +31,7 @@ class OperarController(PanelController):
         self._id_inicial = None
         vista.vincular_acciones(
             al_elegir_activo=self._elegir, al_cambiar_orden=self._actualizar_estimacion,
+            al_cambiar_lado=self.cambiar_lado,
             al_porcentaje=self.elegir_porcentaje, al_enviar=self.enviar,
             al_cerrar_posicion=self.cerrar_posicion, al_cerrar_todas=self.cerrar_todas,
             al_guardar_proteccion=self.guardar_proteccion, al_cancelar_orden=self.cancelar_orden,
@@ -39,6 +42,15 @@ class OperarController(PanelController):
         `id_activo` es el activo que se abre ya elegido (por ejemplo, desde Mercado)."""
         self._id_inicial = id_activo
         self._ejecutar(lambda: self._mercado.obtener_panel().items, al_terminar=self._al_cargar_activos)
+
+    def cambiar_lado(self) -> None:
+        """Comprar <-> Vender. Al vender se propone la posición entera (lo más habitual: cerrarla); al comprar,
+        la caja queda vacía para que no arrastre la cantidad de una venta."""
+        posicion = self._resumen.posicion if self._resumen is not None else None
+        if self._vista.solicitud().lado == LadoOrden.VENTA and posicion is not None:
+            self._vista.establecer_cantidad(posicion.cantidad)
+        else:
+            self._vista.limpiar_cantidad()
 
     def elegir_porcentaje(self, porcentaje: int) -> None:
         """Rellena la cantidad con el 25, 50, 75 o 100 % de lo máximo (saldo al comprar, posición al vender)."""
@@ -159,6 +171,7 @@ class OperarController(PanelController):
         self._patrimonio = estado.patrimonio
         if estado.resumen is not None:
             self._vista.mostrar_resumen(estado.resumen)
+        self._vista.mostrar_patrimonio(estado.patrimonio)
         self._vista.mostrar_posiciones(estado.posiciones)
         self._vista.mostrar_pendientes(estado.pendientes)
         self._vista.mostrar_historial(estado.historial)

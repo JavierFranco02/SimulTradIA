@@ -35,11 +35,12 @@ class ShellView(ttk.Frame):
         pie = ttk.Frame(barra)
         pie.pack(side="bottom", fill="x")
         ttk.Label(pie, text=usuario.nombre, font=Fonts.BODY).pack(anchor="w")
+        estilo_rol = {"bootstyle": Colors.SUCCESS} if usuario.es_admin else {}     # el usuario normal, en el color del tema
         ttk.Label(
             pie,
             text="Administrador" if usuario.es_admin else "Usuario",
             font=Fonts.SMALL,
-            bootstyle=Colors.SUCCESS if usuario.es_admin else Colors.MUTED,
+            **estilo_rol,
         ).pack(anchor="w", pady=(0, Spacing.SM))
         ActionButton(pie, "Cerrar sesión", self._pulsar_cerrar_sesion,
                      estilo=ButtonStyle.DANGER_OUTLINE).pack(fill="x")
@@ -49,7 +50,7 @@ class ShellView(ttk.Frame):
         self._agregar_botones(barra, menu)
         if menu_admin:
             ttk.Label(barra, text="ADMINISTRACIÓN", font=Fonts.SMALL,
-                      bootstyle=Colors.MUTED).pack(anchor="w", pady=(Spacing.LG, Spacing.XS))
+                      ).pack(anchor="w", pady=(Spacing.LG, Spacing.XS))
             self._agregar_botones(barra, menu_admin)
 
     def _agregar_botones(self, barra, menu: Sequence[Tuple[str, str]]) -> None:
