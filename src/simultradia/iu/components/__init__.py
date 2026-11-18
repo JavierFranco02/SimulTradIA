@@ -7,6 +7,7 @@ from simultradia.iu.components.candle_chart import CandleChart
 from simultradia.iu.components.card import Card
 from simultradia.iu.components.data_table import DataTable
 from simultradia.iu.components.dialog import Dialogo
+from simultradia.iu.components.equity_chart import EquityChart
 from simultradia.iu.components.form_field import FormField
 from simultradia.iu.components.password_field import PasswordField
 from simultradia.iu.components.scroll_frame import ScrollFrame
@@ -20,6 +21,7 @@ __all__ = [
     "Card",
     "DataTable",
     "Dialogo",
+    "EquityChart",
     "FormField",
     "PasswordField",
     "ScrollFrame",

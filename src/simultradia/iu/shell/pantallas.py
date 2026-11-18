@@ -11,12 +11,13 @@ _MENU = (
     ("inicio", "Inicio", False),
     ("mercado", "Mercado", False),
     ("operar", "Operar", False),
+    ("portafolio", "Portafolio", False),
     ("admin_usuarios", "Usuarios", True),
     ("admin_activos", "Activos", True),
     ("admin_ingesta", "Ingesta de datos", True),
 )
-# Secciones que el administrador no ve: él gestiona, no opera.
-_SOLO_USUARIOS = ("operar",)
+# Secciones que el administrador no ve: él gestiona, no opera (no tiene cuenta simulada).
+_SOLO_USUARIOS = ("operar", "portafolio")
 
 
 def _home(padre, nav):
