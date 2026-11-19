@@ -17,3 +17,4 @@ class OperacionCerrada:
     abierta_en: Optional[datetime]
     cerrada_en: datetime
     id_operacion_cerrada: Optional[int] = None
+    ticker: Optional[str] = None             # solo viene al leer el historial (Portafolio)
