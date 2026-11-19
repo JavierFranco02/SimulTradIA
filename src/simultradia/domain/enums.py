@@ -46,3 +46,30 @@ class EstadoOrden(str, Enum):
     CANCELADA = "cancelada"
     RECHAZADA = "rechazada"
     EXPIRADA = "expirada"
+
+
+class DireccionPrediccion(str, Enum):
+    ALCISTA = "alcista"
+    LATERAL = "lateral"
+    BAJISTA = "bajista"
+
+
+class TipoModeloIA(str, Enum):
+    DIRECCION = "direccion"
+    VOLATILIDAD = "volatilidad"
+    SENTIMIENTO = "sentimiento"
+    REGIMEN = "regimen"
+
+
+class EstadoModelo(str, Enum):
+    ENTRENANDO = "entrenando"
+    ACTIVO = "activo"
+    ARCHIVADO = "archivado"
+    FALLIDO = "fallido"
+
+
+class EstadoProceso(str, Enum):
+    PENDIENTE = "pendiente"
+    EJECUTANDO = "ejecutando"
+    COMPLETADO = "completado"
+    FALLIDO = "fallido"

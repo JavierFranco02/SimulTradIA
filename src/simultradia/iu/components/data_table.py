@@ -18,11 +18,13 @@ Fila = Tuple[str, Sequence[str], str]          # (id, textos, etiqueta)
 
 
 class DataTable(ttk.Frame):
-    def __init__(self, parent, columnas: Sequence[Columna]):
+    def __init__(self, parent, columnas: Sequence[Columna], alto: Optional[int] = None):
+        """`alto`: cuántas filas se ven (por omisión, lo que ocupe el contenedor)."""
         super().__init__(parent)
         self._titulos = {clave: titulo for clave, titulo, _ancho, _ancla in columnas}
         self._tabla = ttk.Treeview(self, columns=[c[0] for c in columnas], show="headings",
-                                   selectmode="browse", bootstyle="primary")
+                                   selectmode="browse", bootstyle="primary",
+                                   **({"height": alto} if alto else {}))
         ttk.Style().configure("Treeview", rowheight=30)   # filas más altas = más fáciles de leer
         for clave, titulo, ancho, ancla in columnas:
             self._tabla.heading(clave, text=titulo, anchor=ancla)

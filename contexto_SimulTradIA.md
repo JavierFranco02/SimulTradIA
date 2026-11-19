@@ -184,8 +184,8 @@ src/simultradia/
   clients/           binance_client.py (ccxt), yahoo_client.py (yfinance): solo traen datos
   analisis/          velas.py (agrupar, aplicar precio), indicadores.py (SMA, EMA, Bollinger, RSI, MACD, ATR)
   backtesting/       (previsto) motor de simulación puro (sin BD ni UI)
-  jobs/              actualizar_cotizaciones_job.py, actualizar_velas_job.py, evaluar_ordenes_job.py (el worker los repite)
-  ia/                (previsto) modelos y lógica de IA (subdividir en features/entrenamiento/prediccion/explicacion al crecer)
+  jobs/              actualizar_cotizaciones_job.py, actualizar_velas_job.py, evaluar_ordenes_job.py, generar_predicciones_job.py, evaluar_predicciones_job.py (el worker los repite; los de IA, cada hora)
+  ia/                entrenamiento.py (walk-forward, métricas, z, explicar, predecir), serializacion.py (Evaluacion <-> dict JSON), almacen.py (archivos del modelo en `modelos/`, ignorada por git)
   iu/                interfaz de usuario, agrupada por funcionalidad
     styles.py        Fonts (incluye VALUE), Colors, Palette (SOLO gráfico y tabla), ButtonStyle (incluye SUCCESS),
                      Spacing, y `texto_normal(boton)` para los toggles
@@ -193,7 +193,7 @@ src/simultradia/
     background.py    ejecutar_en_hilo / iniciar_revision (hilos de la interfaz)
     navegacion.py    Navegador: ir_a("nombre", **parametros)
     rutas.py         registra las pantallas de todos los módulos
-    components/      clases reutilizables: ActionButton, Card, FormField, PasswordField, ShowPasswordToggle,
+    components/      clases reutilizables: ActionButton, BarList (barras con Canvas), Card, Medidor (barra 0–1 con marca de referencia), Seccion (recuadro con título y explicación), FigureView (figura matplotlib genérica), MetricGrid (cifras en cuadrícula), FormField, PasswordField, ShowPasswordToggle,
                      StatusMessage (solo errores de formulario), DataTable, SelectField, ScrollFrame, Dialogo (base de ventanas emergentes),
                      CandleChart (+ candle_render.py: dibuja con matplotlib, sin tkinter)
     base/            FormView/FormController (formularios, dibujados dentro de una tarjeta con borde) y PanelView/PanelController (secciones)
@@ -203,10 +203,13 @@ src/simultradia/
     inicio/          sección de bienvenida (PROVISIONAL: se rehace al final)
     mercado/         mercado_view (panel dividido + botón «Operar» debajo del gráfico), lista_view/lista_controller,
                      grafico_view (UN solo componente, sin modo compacto)/grafico_controller
+    ia/              ia_view (escáner a la izquierda + pestañas Señal · Proyección · Evaluación · Registro vs. realidad; horizontes
+                     1/3/5/10), ia_controller, senal_view, proyeccion_view, evaluacion_view, registro_view, textos.py (textos y
+                     reglas de presentación, puro), graficos.py (abanico de Monte Carlo y acierto por periodo, rotulado con fechas; matplotlib puro). Señal y Evaluación se explican en lenguaje llano (frases en textos.py: la probabilidad se compara con el azar, 33 %)
     operar/          operar_view (ticket a la derecha + gráfico + pestañas), operar_controller, proteccion_dialog (SL/TP), pantallas.py
-    admin/           usuarios, activos, ingesta: cada uno con su vista y su controlador;
+    admin/           usuarios, activos, ingesta, modelos_ia (entrenar, versiones, comparar algoritmos): cada uno con su vista y su controlador;
                      activo_dialogs.py = ventanas emergentes de Activos (agregar y editar el nombre)
-    <módulo>/        trading/, backtesting/, ia/... cuando lleguen
+    <módulo>/        backtesting/, portafolio/... cuando lleguen
 ```
 **(previsto)** = la carpeta existe solo con su `__init__.py` y un docstring; se llena cuando llegue su módulo.
 Cada módulo de `iu/` tiene su `pantallas.py` con `registrar(navegador)`; `iu/rutas.py` los junta.
@@ -292,7 +295,7 @@ El paquete se llama **`simultradia`** (no `main`: chocaría con `main.py`).
   transacción (9.3 no tiene `ON CONFLICT`).
 - **Intervalos y cotización:** la cotización (`cotizaciones_actuales`, UNA fila por activo) **no depende del
   intervalo**; operar siempre es al precio actual. Las velas se guardan para 15 m (60 días), 1 h (365) y 1 d
-  (1825). **4 h y 1 sem no se guardan:** se arman agrupando 1 h y 1 d. Config en `domain/reglas/intervalos.py`.
+  (3650: 10 años, para entrenar la IA). **4 h y 1 sem no se guardan:** se arman agrupando 1 h y 1 d. Config en `domain/reglas/intervalos.py`.
 - **"Tiempo real":** el worker escribe el precio en la base cada pocos segundos; la interfaz lo lee cada 2 s (gráfico)
   o 3 s (lista y Operar). No hay websocket. La vela en vivo es la última vela guardada con el precio de ahora aplicado
   (`analisis.velas.aplicar_precio`). Solo la cripto abre velas nuevas en vivo; en acciones, ETF e índices el precio
@@ -549,6 +552,10 @@ lo que hace: `autenticar` verifica y no inicia sesión; el controlador es quien 
 49. **Eje horizontal del gráfico con hora o fecha** en cada marca (ver 4.3); sin leyenda explicativa bajo el eje. La línea de datos de la vela lleva fecha (y hora si es intradía).
 50. **Mercado:** «Operar AAPL» va debajo del gráfico (en `MercadoView`, verde sólido, a la derecha); el botón «◀» de ocultar la lista va en el encabezado «Activos» de la lista y, oculta, queda un riel con «▶»; la lista tiene columna «Nombre» (se ordena de la A a la Z).
 51. **Los cambios visuales se validan primero con mockups** y se entregan en un `.zip` acumulativo (sección 2, puntos 3 y 9; sección 5.5). Todo diseño debe ser realizable con ttkbootstrap (5.4).
+53. **IA, fase 1 (motor sin interfaz).** Se predice la dirección (bajista/lateral/alcista) a 1, 3, 5 y 10 días, un modelo por horizonte, con LightGBM global sobre velas diarias CERRADAS. Etiqueta: retorno a h días contra `0.5 × volatilidad_20d × √h`. 14 features en Python puro (`analisis/features.py`), sin mirar el futuro. Validación walk-forward de 4 tramos con purga (`dias_de_purga`), comparada con la clase mayoritaria del entrenamiento y con un z conservador (días de prueba únicos ÷ horizonte); un modelo «supera la base» solo con z ≥ 1,65. El modelo se inyecta (`crear_modelo`) para probar con scikit-learn sin LightGBM. Monte Carlo (`analisis/montecarlo.py`) es solo dispersión de precio, no la predicción. Reglas en `domain/reglas/prediccion.py`. Sin interfaz todavía.
+54. **IA, fase 2 (datos y worker).** Tablas en `database/ia.sql` (`modelos_ia`, `entrenamientos_modelo`, `predicciones_direccion`, `explicaciones_prediccion`; tipos `direccion_prediccion`, `tipo_modelo_ia`, `estado_modelo`, `estado_proceso`). `ModeloIAService` (admin): `entrenar(actor, horizonte)` (lee velas en una conexión, entrena sin conexión, guarda en otra), `listar`, `activar`; un modelo queda ACTIVO solo si supera la base (z ≥ 1,65), si no queda ARCHIVADO con sus métricas y sigue el anterior; activar a mano también lo exige. `PrediccionService`: `generar_predicciones` (UNA por día UTC por activo/modelo/horizonte, con la última vela diaria cerrada; se omite el activo sin velas al día), `evaluar_vencidas` (mira la vela `horizonte` después de la de referencia y aplica el mismo umbral), y lecturas `senales`, `historial`, `factores`, `precision_en_vivo`, `modelo_activo`. `fecha_objetivo` = cierre de la vela objetivo (cripto: días corridos; lo demás: lunes a viernes). El worker corre ambas tareas cada hora en su propio hilo. El archivo de cada modelo va en `modelos/modelo_<id>.pkl` (pickle; solo se leen los escritos por la propia app) y la base guarda la ruta relativa.
+55. **IA, fase 3 (pantalla del usuario).** Sección «Predicciones IA» del menú (la ven usuarios y admin). Se eligió `ttk.Notebook` SOLO para las pestañas internas de esta pantalla (la regla 5.4 prohíbe Notebook para las secciones de la app, no para esto). Si el horizonte no tiene modelo activo, en vez de las pestañas se explica por qué. `PrediccionService` suma `resumen(horizonte)` (modelo activo + escáner ordenado por confianza + acierto real), `detalle(id_activo, horizonte)` (predicción vigente, factores, historial) y `proyectar(id_activo, dias, nivel)` (Monte Carlo con las velas cerradas y el precio actual; el «nivel a vigilar» lo escribe el usuario). Se refresca cada minuto; si cambia la predicción vigente de un activo, el detalle se vuelve a pedir. Omitido a propósito por ahora: curva de acierto en vivo y comparación contra comprar y mantener.
+56. **IA, fase 4 (admin).** Sección «Modelos de IA» (solo admin): estado del ciclo (última predicción, de hoy, pendientes, evaluadas), horizonte 1/3/5/10, «Entrenar y evaluar» (confirma; corre en hilo; avisa si el modelo quedó activo o no), tabla de versiones, «Activar esta versión» (solo archivadas que superan la base) y «Comparar algoritmos» (LightGBM vs Random forest con el mismo walk-forward y los mismos datos, más la base; no guarda nada). Servicios: `ModeloIAService.comparar`, `PrediccionService.estado_ciclo`. Si el admin sale de la pantalla mientras entrena, el entrenamiento termina y se guarda igual.
 52. **El menú lateral del shell se queda como está.** Se evaluó una barra de íconos y pestañas arriba (no caben los módulos futuros ni el menú de admin con textos largos); se descartó. Si más adelante se quiere ahorrar ancho, la opción acordada como válida es una barra lateral **ocultable** (mismo patrón ◀/▶ de 5.1).
 
 ---
@@ -687,6 +694,11 @@ apruebe el mockup**.
   (el admin no opera, y los servicios lo exigen; no se borra nada); al volver a usuario se reutiliza esa cuenta, y si nunca
   tuvo una (se creó como admin) se crea una nueva con el capital inicial en la misma transacción. No se puede cambiar el
   rol propio ni dejar al sistema sin ningún admin.
+
+**IA / Predicciones (en curso; mockup v3 aprobado)**
+- Hechas las fases 1 (motor) y 2 (tablas, servicios, worker). Antes de usarlas: `pip install -e .`, `psql -d simulador_trading -v ON_ERROR_STOP=1 -f database/ia.sql`, `python scripts/recargar_velas_diarias.py` y dejar que `python worker.py` baje los 10 años de velas diarias.
+- Hecha la fase 3 (pantalla del usuario) y la 4 (admin «Modelos de IA»); ambas solo compiladas y probadas con widgets falsos: el aspecto real lo valida el usuario. Quedó descrita así (ya hecha): pantalla de admin «Entrenar y evaluar» (en hilo), versiones, activar/revertir. Un modelo se activa solo si supera la base.
+- Sin verificar: el SQL de `ia.sql` y de los repositorios (sin PostgreSQL), en particular el índice único por día `((generada_en AT TIME ZONE 'UTC')::date)`; `explicar` usa `booster_.predict(pred_contrib=True)` (diseño de columnas por clase no probado con LightGBM real).
 
 **Pendiente del usuario (orden propuesto)**
 **Portafolio** (patrimonio, rentabilidad vs capital inicial, drawdown, % de aciertos, evolución del capital con

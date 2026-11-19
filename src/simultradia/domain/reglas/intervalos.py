@@ -12,7 +12,7 @@ SEGUNDOS: Dict[I, int] = {
 }
 
 # Intervalos que se descargan y guardan en la base: intervalo -> días de historia.
-GUARDADOS: Dict[I, int] = {I.M15: 60, I.H1: 365, I.D1: 1825}
+GUARDADOS: Dict[I, int] = {I.M15: 60, I.H1: 365, I.D1: 3650}
 
 # Intervalos que NO se guardan: se arman agrupando las velas de otro intervalo.
 DERIVADOS: Dict[I, I] = {I.H4: I.H1, I.W1: I.D1}

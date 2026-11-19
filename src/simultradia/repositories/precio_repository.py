@@ -38,6 +38,12 @@ class PrecioRepository:
             cur.execute("DELETE FROM precios_velas WHERE id_activo = %s", (id_activo,))
             cur.execute("DELETE FROM cotizaciones_actuales WHERE id_activo = %s", (id_activo,))
 
+    def borrar_velas_de_intervalo(self, conn, intervalo: IntervaloVela) -> int:
+        """Borra TODAS las velas de un intervalo (de todos los activos). Devuelve cuántas."""
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM precios_velas WHERE intervalo = %s", (intervalo.value,))
+            return cur.rowcount
+
     def ultima_actualizacion(self, conn) -> Optional[datetime]:
         with conn.cursor() as cur:
             cur.execute("SELECT max(actualizado_en) AS ultima FROM cotizaciones_actuales")
