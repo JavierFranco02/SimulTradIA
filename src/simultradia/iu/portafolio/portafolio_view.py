@@ -1,8 +1,9 @@
 """Portafolio: cómo le va a la cuenta simulada. Dos pestañas:
 
   - Resumen: franja con seis cifras (patrimonio, rentabilidad, saldo, posiciones, P&L no realizado y realizado);
-    debajo, a la izquierda, la curva de capital con la caída desde el máximo (selector 1 día / 1 sem / 1 mes / Todo) y,
-    a la derecha, la tabla de métricas de rendimiento y riesgo.
+    debajo, a la izquierda, la curva de capital con la caída desde el máximo (selector 1 día / 1 sem / 1 mes / Todo;
+    empieza en 1 día) y, a la derecha, dos tablas: «Riesgo» (cuánto se puede perder o se mueve el capital) y
+    «Operaciones» (qué tan bien salen las ventas ya hechas, más las comisiones).
   - Operaciones cerradas: cada venta con su ganancia (de la más nueva a la más vieja).
 
 Las posiciones abiertas y las órdenes viven en Operar; aquí solo se mide cómo va todo.
@@ -22,6 +23,7 @@ from simultradia.iu.styles import ButtonStyle, Colors, Fonts, Spacing, texto_nor
 from simultradia.services.portafolio_service import ResumenPortafolio
 
 _RANGOS = (("1 día", 24), ("1 sem", 168), ("1 mes", 720), ("Todo", None))     # texto del botón -> horas a mostrar
+_RANGO_INICIAL = "1 día"
 _CIFRAS = (("patrimonio", "Patrimonio"), ("rentabilidad", "Rentabilidad"), ("saldo", "Saldo disponible"),
            ("posiciones", "En posiciones"), ("no_realizado", "P&L no realizado"), ("realizado", "P&L realizado"))
 _COLUMNAS_METRICAS = (
@@ -75,27 +77,31 @@ class PortafolioView(PanelView):
 
         cuerpo = ttk.Frame(padre)
         cuerpo.pack(fill="both", expand=True)
+
+        # Derecha: dos tablas chicas apiladas (cada una con su título), de tamaño fijo.
         derecha = ttk.Frame(cuerpo)
         derecha.pack(side="right", fill="y", padx=(Spacing.MD, 0))
-        ttk.Label(derecha, text="Métricas de rendimiento y riesgo", font=Fonts.VALUE
-                  ).pack(anchor="w", pady=(0, Spacing.XS))
-        self._tabla_metricas = DataTable(derecha, _COLUMNAS_METRICAS)
-        self._tabla_metricas.pack(fill="both", expand=True)
+        ttk.Label(derecha, text="Riesgo", font=Fonts.VALUE).pack(anchor="w", pady=(0, Spacing.XS))
+        self._tabla_riesgo = DataTable(derecha, _COLUMNAS_METRICAS, alto=4)
+        self._tabla_riesgo.pack(fill="x")
         ttk.Label(derecha, font=Fonts.SMALL, justify="left", wraplength=340,
                   text="La volatilidad y el Sharpe necesitan %d días de historial; antes salen «—»." % DIAS_MINIMOS
-                  ).pack(anchor="w", pady=(Spacing.SM, 0))
+                  ).pack(anchor="w", pady=(Spacing.XS, 0))
+        ttk.Label(derecha, text="Operaciones", font=Fonts.VALUE).pack(anchor="w", pady=(Spacing.MD, Spacing.XS))
+        self._tabla_estadisticas = DataTable(derecha, _COLUMNAS_METRICAS, alto=8)
+        self._tabla_estadisticas.pack(fill="x")
 
         izquierda = ttk.Frame(cuerpo)
         izquierda.pack(side="left", fill="both", expand=True)
         barra = ttk.Frame(izquierda)
         barra.pack(fill="x")
-        self._rango = tk.StringVar(master=self, value="Todo")
+        self._rango = tk.StringVar(master=self, value=_RANGO_INICIAL)
         for texto, _horas in _RANGOS:
             boton = ttk.Radiobutton(barra, text=texto, value=texto, variable=self._rango,
                                     command=self._pulsar_rango, bootstyle=ButtonStyle.TOGGLE)
             boton.pack(side="left", padx=(0, Spacing.XS))
             texto_normal(boton)
-        self._grafico = EquityChart(izquierda)
+        self._grafico = EquityChart(izquierda, horas=dict(_RANGOS)[_RANGO_INICIAL])
         self._grafico.pack(fill="both", expand=True, pady=(Spacing.SM, 0))
 
     # ------------------------------------------- lo que el controlador ordena
@@ -107,8 +113,10 @@ class PortafolioView(PanelView):
         self._pintar("no_realizado", dinero(r.pnl_no_realizado, r.moneda, con_signo=True), r.pnl_no_realizado)
         self._pintar("realizado", dinero(r.pnl_realizado, r.moneda, con_signo=True), r.pnl_realizado)
         self._grafico.establecer_datos(r.puntos, r.caidas, r.capital_inicial)
-        self._tabla_metricas.establecer_filas([
-            (clave, (nombre, valor), "") for clave, nombre, valor in self._metricas(r)])
+        self._tabla_riesgo.establecer_filas([
+            (clave, (nombre, valor), "") for clave, nombre, valor in self._metricas_riesgo(r)])
+        self._tabla_estadisticas.establecer_filas([
+            (clave, (nombre, valor), "") for clave, nombre, valor in self._metricas_operaciones(r)])
         self._tabla_operaciones.establecer_filas([
             (str(o.operacion.id_operacion_cerrada),
              (fecha_hora(o.operacion.cerrada_en), str(o.operacion.ticker), unidades(o.operacion.cantidad),
@@ -129,8 +137,19 @@ class PortafolioView(PanelView):
         self._cifras[clave].configure(text=texto, **({"bootstyle": color} if color else {"style": "TLabel"}))
 
     @staticmethod
-    def _metricas(r: ResumenPortafolio) -> List[Tuple[str, str, str]]:
-        """Las filas de la tabla de métricas: (clave, nombre, valor ya escrito). Lo que no se puede calcular, «—»."""
+    def _metricas_riesgo(r: ResumenPortafolio) -> List[Tuple[str, str, str]]:
+        """Filas de «Riesgo»: (clave, nombre, valor ya escrito). Lo que no se puede calcular, «—»."""
+        return [
+            ("caida", "Caída máxima", porcentaje(Decimal(str(round(r.caida_maxima, 2))))),
+            ("volatilidad", "Volatilidad anual",
+             "—" if r.volatilidad_anual is None else porcentaje(Decimal(str(round(r.volatilidad_anual, 2))))),
+            ("sharpe", "Ratio de Sharpe", "—" if r.sharpe is None else _decimales(r.sharpe)),
+            ("exposicion", "Exposición", porcentaje(r.exposicion_pct)),
+        ]
+
+    @staticmethod
+    def _metricas_operaciones(r: ResumenPortafolio) -> List[Tuple[str, str, str]]:
+        """Filas de «Operaciones» (las ventas ya hechas, y las comisiones). Lo que no se puede calcular, «—»."""
         e = r.estadisticas
 
         def dinero_o_guion(valor: Optional[Decimal]) -> str:
@@ -139,11 +158,6 @@ class PortafolioView(PanelView):
         mejor_peor = "—" if e.mejor is None else "%s / %s" % (
             dinero(e.mejor, "", con_signo=True).strip(), dinero(e.peor, "", con_signo=True).strip())
         return [
-            ("caida", "Caída máxima", porcentaje(Decimal(str(round(r.caida_maxima, 2))))),
-            ("volatilidad", "Volatilidad anual",
-             "—" if r.volatilidad_anual is None else porcentaje(Decimal(str(round(r.volatilidad_anual, 2))))),
-            ("sharpe", "Ratio de Sharpe", "—" if r.sharpe is None else _decimales(r.sharpe)),
-            ("exposicion", "Exposición", porcentaje(r.exposicion_pct)),
             ("operaciones", "Operaciones cerradas", str(e.total)),
             ("aciertos", "Tasa de aciertos", "—" if e.tasa_aciertos is None else porcentaje(e.tasa_aciertos)),
             ("factor", "Factor de beneficio",

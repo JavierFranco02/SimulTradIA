@@ -6,6 +6,7 @@
 Cada fila es (id, textos de cada columna, etiqueta). La etiqueta ("alza", "baja" o "") pinta
 el texto de verde o rojo. Al refrescar, las filas se actualizan EN SU LUGAR: no se pierde la
 fila seleccionada ni el desplazamiento aunque la tabla se renueve cada pocos segundos.
+`alto` (opcional) son las filas que se ven a la vez: sirve para tablas chicas de tamaño fijo (por ejemplo, 4).
 """
 from typing import Callable, Optional, Sequence, Tuple
 
@@ -18,11 +19,12 @@ Fila = Tuple[str, Sequence[str], str]          # (id, textos, etiqueta)
 
 
 class DataTable(ttk.Frame):
-    def __init__(self, parent, columnas: Sequence[Columna]):
+    def __init__(self, parent, columnas: Sequence[Columna], alto: Optional[int] = None):
         super().__init__(parent)
         self._titulos = {clave: titulo for clave, titulo, _ancho, _ancla in columnas}
         self._tabla = ttk.Treeview(self, columns=[c[0] for c in columnas], show="headings",
-                                   selectmode="browse", bootstyle="primary")
+                                   selectmode="browse", bootstyle="primary",
+                                   **({"height": alto} if alto else {}))
         ttk.Style().configure("Treeview", rowheight=30)   # filas más altas = más fáciles de leer
         for clave, titulo, ancho, ancla in columnas:
             self._tabla.heading(clave, text=titulo, anchor=ancla)

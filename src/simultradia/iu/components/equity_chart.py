@@ -1,6 +1,6 @@
 """Gráfico de la curva de capital para la interfaz: pone la figura de matplotlib dentro de tkinter.
 
-    grafico = EquityChart(padre)
+    grafico = EquityChart(padre, horas=24)                         # rango inicial: las últimas 24 horas
     grafico.establecer_datos(puntos, caidas, capital_inicial)      # lo que entrega PortafolioService
     grafico.establecer_rango(168)                                  # solo las últimas 168 horas (None = todo)
 
@@ -20,7 +20,7 @@ from simultradia.iu.styles import Palette
 
 
 class EquityChart(ttk.Frame):
-    def __init__(self, parent):
+    def __init__(self, parent, horas: Optional[int] = None):
         super().__init__(parent)
         self._figura = Figure(facecolor=Palette.FONDO)
         self._lienzo = FigureCanvasTkAgg(self._figura, master=self)
@@ -31,7 +31,7 @@ class EquityChart(ttk.Frame):
         self._puntos: Optional[Sequence[SnapshotPortafolio]] = None
         self._caidas: Sequence[float] = ()
         self._capital = Decimal(0)
-        self._horas: Optional[int] = None
+        self._horas: Optional[int] = horas       # cuántas horas se ven (None = toda la historia)
         self._dibujo: Optional[Dibujo] = None
         self._indice_texto = None
         self._lienzo.mpl_connect("motion_notify_event", self._al_mover)
