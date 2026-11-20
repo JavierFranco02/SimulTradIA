@@ -8,7 +8,7 @@ from simultradia.domain.enums import EstadoModelo, TipoModeloIA
 
 @dataclass
 class ModeloIA:
-    nombre: str                                  # 'direccion_5d'
+    nombre: str                                  # 'direccion_1d'
     version: str                                 # 'v3'
     tipo: TipoModeloIA = TipoModeloIA.DIRECCION
     algoritmo: Optional[str] = None

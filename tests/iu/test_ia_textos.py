@@ -50,7 +50,7 @@ class PruebasTextos(unittest.TestCase):
     def test_frases_llanas(self):
         self.assertIn("poco", textos.frase_direccion(D.LATERAL, 1))
         self.assertIn("1 día", textos.frase_direccion(D.ALCISTA, 1))
-        self.assertIn("5 días", textos.frase_direccion(D.BAJISTA, 5))
+        self.assertIn("2 días", textos.frase_direccion(D.BAJISTA, 2))
         self.assertIn("33\xa0%", textos.frase_confianza(0.59))
         self.assertEqual(textos.nombre_modelo(1, "v2"), "Modelo a 1 día · versión 2")
 

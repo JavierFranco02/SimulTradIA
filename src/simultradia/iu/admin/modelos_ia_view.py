@@ -7,19 +7,17 @@ from datetime import datetime, timezone
 from tkinter import messagebox
 from typing import Callable, Dict, List, Optional
 
-import tkinter as tk
 import ttkbootstrap as ttk
 
 from simultradia.domain.entities.modelo_ia_entity import ModeloIA
 from simultradia.domain.entities.prediccion_entity import EstadoCiclo
 from simultradia.domain.enums import EstadoModelo
-from simultradia.domain.reglas.prediccion import HORIZONTE_INICIAL, HORIZONTES
 from simultradia.ia.serializacion import desde_dict
 from simultradia.iu.base.panel_view import PanelView
 from simultradia.iu.components import ActionButton, DataTable
 from simultradia.iu.formato import fecha_hora, hace
 from simultradia.iu.ia import textos
-from simultradia.iu.styles import ButtonStyle, Colors, Fonts, Spacing, texto_normal
+from simultradia.iu.styles import ButtonStyle, Colors, Fonts, Spacing
 
 _FRESCO_HORAS = 26      # se genera una vez al día: más viejo que esto indica que el worker no está corriendo
 _ESTADOS = {EstadoModelo.ACTIVO: "Activo", EstadoModelo.ARCHIVADO: "Archivado",
@@ -45,8 +43,8 @@ _COLUMNAS_COMPARACION = (
 class ModelosIAView(PanelView):
     def __init__(self, parent):
         super().__init__(parent, "Modelos de IA", "Entrenar, evaluar y activar los modelos que generan las predicciones")
-        self._al_entrenar: Optional[Callable[[int], None]] = None
-        self._al_comparar: Optional[Callable[[int], None]] = None
+        self._al_entrenar: Optional[Callable[[], None]] = None
+        self._al_comparar: Optional[Callable[[], None]] = None
         self._al_activar: Optional[Callable[[int], None]] = None
         self._activables: Dict[str, bool] = {}          # id del modelo -> se puede activar
         self._ocupado = False
@@ -68,16 +66,9 @@ class ModelosIAView(PanelView):
                        "Un modelo solo se activa si supera a la base en la validación; si no, queda archivado."
                   ).pack(anchor="w", pady=(0, Spacing.MD))
 
-        # Entrenar: horizonte + botones.
+        # Entrenar.
         barra = ttk.Frame(self)
         barra.pack(fill="x")
-        ttk.Label(barra, text="Horizonte", font=Fonts.BODY).pack(side="left", padx=(0, Spacing.SM))
-        self._horizonte = tk.StringVar(master=self, value=str(HORIZONTE_INICIAL))
-        for horizonte in HORIZONTES:
-            boton = ttk.Radiobutton(barra, text="%d %s" % (horizonte, "día" if horizonte == 1 else "días"),
-                                    value=str(horizonte), variable=self._horizonte, bootstyle=ButtonStyle.TOGGLE)
-            boton.pack(side="left", padx=(0, Spacing.XS))
-            texto_normal(boton)
         self._boton_entrenar = ActionButton(barra, "Entrenar y evaluar", self._pulsar_entrenar,
                                             "Entrenando... (varios minutos)")
         self._boton_entrenar.pack(side="right")
@@ -104,15 +95,12 @@ class ModelosIAView(PanelView):
         self._tabla_comparacion = DataTable(self._comparacion, _COLUMNAS_COMPARACION, alto=4)
         self._tabla_comparacion.pack(fill="x")
 
-    def vincular_acciones(self, al_entrenar: Callable[[int], None], al_comparar: Callable[[int], None],
+    def vincular_acciones(self, al_entrenar: Callable[[], None], al_comparar: Callable[[], None],
                           al_activar: Callable[[int], None]) -> None:
         self._al_entrenar, self._al_comparar, self._al_activar = al_entrenar, al_comparar, al_activar
 
     def confirmar(self, mensaje: str) -> bool:
         return messagebox.askyesno("Confirmar", mensaje, parent=self)
-
-    def horizonte(self) -> int:
-        return int(self._horizonte.get())
 
     @property
     def ocupado(self) -> bool:
@@ -157,10 +145,9 @@ class ModelosIAView(PanelView):
         self._tabla.establecer_filas(filas)
         self._actualizar_boton_activar()
 
-    def mostrar_comparacion(self, horizonte: int, filas) -> None:
+    def mostrar_comparacion(self, filas) -> None:
         """`filas`: lista de (algoritmo, Evaluacion). Se agrega, al final, la base (acertar siempre la clase más frecuente)."""
-        self._titulo_comparacion.configure(text="Comparación de algoritmos · %d %s"
-                                           % (horizonte, "día" if horizonte == 1 else "días"))
+        self._titulo_comparacion.configure(text="Comparación de algoritmos")
         datos = [(str(i), (nombre, textos.pct(ev.acierto, 1), textos.numero(ev.z),
                            textos.numero(ev.auc, 3) if ev.auc is not None else "—", ev.veredicto),
                   "alza" if ev.supera_base else "baja") for i, (nombre, ev) in enumerate(filas)]
@@ -179,11 +166,11 @@ class ModelosIAView(PanelView):
 
     def _pulsar_entrenar(self) -> None:
         if self._al_entrenar:
-            self._al_entrenar(self.horizonte())
+            self._al_entrenar()
 
     def _pulsar_comparar(self) -> None:
         if self._al_comparar:
-            self._al_comparar(self.horizonte())
+            self._al_comparar()
 
     def _pulsar_activar(self) -> None:
         iid = self._tabla.seleccionado()

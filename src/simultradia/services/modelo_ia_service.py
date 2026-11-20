@@ -1,7 +1,7 @@
 """Administración de los modelos de IA: entrenar, ver las versiones y activar una.
 
 Entrenar tarda (minutos): se llama desde un hilo. Se lee el historial en UNA conexión, se entrena SIN
-conexión abierta y se guarda en otra. Cada horizonte (1, 3, 5, 10 días) es un modelo aparte.
+conexión abierta y se guarda en otra. El horizonte (hoy solo 1 día, `HORIZONTES`) llega como dato.
 Un modelo solo queda ACTIVO si supera la base en la validación (z >= Z_MINIMO); si no, se guarda como
 ARCHIVADO con sus métricas, para poder verlas, y sigue activo el anterior (si lo había).
 """

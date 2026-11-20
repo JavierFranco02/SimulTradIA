@@ -8,9 +8,9 @@ from typing import Tuple
 
 from simultradia.domain.enums import DireccionPrediccion, TipoActivo
 
-# Días hacia adelante que se predicen. Cada uno es un modelo aparte.
-HORIZONTES: Tuple[int, ...] = (1, 3, 5, 10)
-HORIZONTE_INICIAL = 5
+# Días hacia adelante que se predicen: uno solo, a 1 día. El resto del código recibe el horizonte como dato.
+HORIZONTE = 1
+HORIZONTES: Tuple[int, ...] = (HORIZONTE,)
 
 # Clase (índice de las probabilidades) -> dirección que se guarda y se muestra.
 DIRECCIONES = (DireccionPrediccion.BAJISTA, DireccionPrediccion.LATERAL, DireccionPrediccion.ALCISTA)

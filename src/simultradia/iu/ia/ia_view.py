@@ -1,19 +1,16 @@
 """Pantalla «Predicciones IA»: el escáner de activos a la izquierda y, a la derecha, las pestañas del activo elegido.
 
-  - Arriba: el horizonte (1, 3, 5 o 10 días). Cada uno es un modelo distinto.
   - Escáner: los activos con predicción vigente, de mayor a menor confianza (verde sube, rojo baja).
   - Pestañas: Señal · Proyección · Evaluación · Registro vs. realidad.
-Si el horizonte no tiene modelo activo, en lugar de las pestañas se explica por qué.
+Si no hay modelo activo, en lugar de las pestañas se explica por qué.
 
 Vista pasiva: IAController decide qué pedir y le entrega los datos.
 """
 from typing import Callable, Dict, Optional, Tuple
 
-import tkinter as tk
 import ttkbootstrap as ttk
 
 from simultradia.analisis.montecarlo import Proyeccion
-from simultradia.domain.reglas.prediccion import HORIZONTES, HORIZONTE_INICIAL
 from simultradia.ia.serializacion import desde_dict
 from simultradia.iu.base.panel_view import PanelView
 from simultradia.iu.components import DataTable
@@ -22,7 +19,7 @@ from simultradia.iu.ia.evaluacion_view import EvaluacionView
 from simultradia.iu.ia.proyeccion_view import ProyeccionView
 from simultradia.iu.ia.registro_view import RegistroView
 from simultradia.iu.ia.senal_view import SenalView
-from simultradia.iu.styles import ButtonStyle, Fonts, Spacing, texto_normal
+from simultradia.iu.styles import Fonts, Spacing
 
 _COLUMNAS = (
     ("ticker", "Activo", 110, "w"),
@@ -35,20 +32,12 @@ _ANCHO_ESCANER = 340
 class IAView(PanelView):
     def __init__(self, parent):
         super().__init__(parent, padding=Spacing.MD)
-        self._al_elegir_horizonte: Optional[Callable[[int], None]] = None
         self._al_elegir_activo: Optional[Callable[[int], None]] = None
         self._activos: Dict[int, Tuple[str, str]] = {}    # id del activo -> (ticker, nombre) de los del escáner
 
         cabecera = ttk.Frame(self)
         cabecera.pack(fill="x", pady=(0, Spacing.SM))
         ttk.Label(cabecera, text="Predicciones IA", font=Fonts.HEADING).pack(side="left")
-        self._horizonte = tk.StringVar(master=self, value=str(HORIZONTE_INICIAL))
-        for horizonte in reversed(HORIZONTES):          # a la derecha, de menor a mayor
-            boton = ttk.Radiobutton(cabecera, text="%d %s" % (horizonte, "día" if horizonte == 1 else "días"),
-                                    value=str(horizonte), variable=self._horizonte,
-                                    command=self._pulsar_horizonte, bootstyle=ButtonStyle.TOGGLE)
-            boton.pack(side="right", padx=(Spacing.XS, 0))
-            texto_normal(boton)
 
         cuerpo = ttk.Frame(self)
         cuerpo.pack(fill="both", expand=True)
@@ -77,28 +66,21 @@ class IAView(PanelView):
         izquierda.grid(row=0, column=0, sticky="nsew", padx=(0, Spacing.MD))
         derecha.grid(row=0, column=1, sticky="nsew")
 
-    def vincular_acciones(self, al_elegir_horizonte: Callable[[int], None],
-                          al_elegir_activo: Callable[[int], None],
+    def vincular_acciones(self, al_elegir_activo: Callable[[int], None],
                           al_calcular_nivel: Callable[[], None]) -> None:
-        self._al_elegir_horizonte = al_elegir_horizonte
         self._al_elegir_activo = al_elegir_activo
         self.proyeccion.vincular_acciones(al_calcular_nivel)
 
     # --------------------------------------------- lo que el controlador lee
-    def horizonte(self) -> int:
-        return int(self._horizonte.get())
-
     def texto_nivel(self) -> str:
         return self.proyeccion.texto_nivel()
 
     # ------------------------------------------- lo que el controlador ordena
     def mostrar_resumen(self, resumen) -> None:
-        horizonte = resumen.horizonte
         if resumen.modelo is None:
             self._pestanas.pack_forget()
-            self._sin_modelo.configure(text="No hay un modelo activo para %d %s.\n\nO todavía no se entrenó, o no "
-                                            "superó a la base. Un administrador puede entrenarlo."
-                                            % (horizonte, "día" if horizonte == 1 else "días"))
+            self._sin_modelo.configure(text="No hay un modelo activo.\n\nO todavía no se entrenó, o no superó a la "
+                                            "base. Un administrador puede entrenarlo.")
             self._sin_modelo.pack(expand=True)
             self._escaner.establecer_filas([])
             self._pie.configure(text="")
@@ -140,10 +122,6 @@ class IAView(PanelView):
         self.registro.mostrar_historial(None, [])
 
     # --------------------------------------------------------- eventos de la UI
-    def _pulsar_horizonte(self) -> None:
-        if self._al_elegir_horizonte:
-            self._al_elegir_horizonte(self.horizonte())
-
     def _pulsar_activo(self, iid: Optional[str]) -> None:
         if iid is not None and self._al_elegir_activo:
             self._al_elegir_activo(int(iid))

@@ -26,7 +26,7 @@ class ModeloServicioFalso:
 
     def entrenar(self, actor, horizonte):
         self.llamadas.append(("entrenar", actor, horizonte))
-        return self._responder(ResultadoModelo(ModeloIA("direccion_5d", "v2"), _EV, True))
+        return self._responder(ResultadoModelo(ModeloIA("direccion_1d", "v2"), _EV, True))
 
     def comparar(self, actor, horizonte):
         self.llamadas.append(("comparar", actor, horizonte))
@@ -66,7 +66,7 @@ class VistaModelosFalsa:
     def mostrar_error(self, texto): self.errores.append(texto)
     def mostrar_exito(self, texto): self.exitos.append(texto)
     def mostrar_estado(self, modelos, ciclo): self.eventos.append(("estado", modelos))
-    def mostrar_comparacion(self, horizonte, filas): self.eventos.append(("comparacion", horizonte, filas))
+    def mostrar_comparacion(self, filas): self.eventos.append(("comparacion", filas))
 
 
 class PruebasModelosIAController(unittest.TestCase):
@@ -90,9 +90,9 @@ class PruebasModelosIAController(unittest.TestCase):
 
     def test_entrenar_confirma_ocupa_los_botones_avisa_y_refresca(self):
         vista, servicio, _ = self._crear()
-        vista.acciones["al_entrenar"](5)
+        vista.acciones["al_entrenar"]()
         self.assertEqual(len(vista.confirmaciones), 1)
-        self.assertEqual(servicio.llamadas[0], ("entrenar", self.admin, 5))
+        self.assertEqual(servicio.llamadas[0], ("entrenar", self.admin, 1))
         self.assertEqual(vista.eventos[0], ("ocupado", True, "entrenar"))
         self.assertIn(("ocupado", False, "entrenar"), vista.eventos)
         self.assertFalse(vista.ocupado)
@@ -101,29 +101,30 @@ class PruebasModelosIAController(unittest.TestCase):
 
     def test_si_el_administrador_no_confirma_no_se_entrena(self):
         vista, servicio, _ = self._crear(confirma=False)
-        vista.acciones["al_entrenar"](5)
+        vista.acciones["al_entrenar"]()
         self.assertEqual(servicio.llamadas, [])
         self.assertFalse(vista.ocupado)
 
     def test_no_se_lanza_otra_accion_mientras_hay_una_en_curso(self):
         vista, servicio, _ = self._crear()
         vista._ocupado = True
-        for accion, valor in (("al_entrenar", 5), ("al_comparar", 5), ("al_activar", 1)):
-            vista.acciones[accion](valor)
+        vista.acciones["al_entrenar"]()
+        vista.acciones["al_comparar"]()
+        vista.acciones["al_activar"](1)
         self.assertEqual(servicio.llamadas, [])
 
     def test_un_error_al_entrenar_se_muestra_y_libera_los_botones(self):
         vista, servicio, _ = self._crear()
         servicio.error = ErrorOperacionInvalida("No hay velas diarias suficientes para entrenar.")
-        vista.acciones["al_entrenar"](5)
+        vista.acciones["al_entrenar"]()
         self.assertEqual(vista.errores, ["No hay velas diarias suficientes para entrenar."])
         self.assertFalse(vista.ocupado)
 
     def test_comparar_muestra_la_tabla(self):
         vista, servicio, _ = self._crear()
-        vista.acciones["al_comparar"](3)
-        self.assertEqual(servicio.llamadas[0], ("comparar", self.admin, 3))
-        self.assertEqual(vista.eventos[-1], ("comparacion", 3, [("LightGBM", _EV)]))
+        vista.acciones["al_comparar"]()
+        self.assertEqual(servicio.llamadas[0], ("comparar", self.admin, 1))
+        self.assertEqual(vista.eventos[-1], ("comparacion", [("LightGBM", _EV)]))
         self.assertFalse(vista.ocupado)
 
     def test_activar_pide_confirmacion_y_refresca(self):
@@ -136,8 +137,8 @@ class PruebasModelosIAController(unittest.TestCase):
         self.assertEqual(servicio2.llamadas, [])
 
     def test_texto_del_resultado(self):
-        activo = texto_resultado(ResultadoModelo(ModeloIA("direccion_5d", "v2"), _EV, True))
-        self.assertEqual(activo, "direccion_5d v2: supera la base (z = 2,41). Quedó activo.")
+        activo = texto_resultado(ResultadoModelo(ModeloIA("direccion_1d", "v2"), _EV, True))
+        self.assertEqual(activo, "direccion_1d v2: supera la base (z = 2,41). Quedó activo.")
         no = texto_resultado(ResultadoModelo(ModeloIA("direccion_1d", "v1"), _EV_MALA, False))
         self.assertIn("No se activó", no)
 

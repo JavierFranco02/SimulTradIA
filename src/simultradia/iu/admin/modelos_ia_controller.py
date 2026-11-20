@@ -5,6 +5,7 @@
     y al terminar avisan con un diálogo. Si el administrador sale de la pantalla, el entrenamiento igual termina y se guarda.
   - «Activar» vuelve a poner activa una versión archivada que supera la base.
 """
+from simultradia.domain.reglas.prediccion import HORIZONTE
 from simultradia.iu.base.panel_controller import PanelController
 from simultradia.iu.ia import textos
 
@@ -31,30 +32,29 @@ class ModelosIAController(PanelController):
     def cargar(self) -> None:
         self._ciclo()
 
-    def entrenar(self, horizonte: int) -> None:
+    def entrenar(self) -> None:
         if self._vista.ocupado:
             return
-        if not self._vista.confirmar("Entrenar a %d días lee todo el historial y puede tardar varios minutos. "
-                                     "¿Continuar?" % horizonte):
+        if not self._vista.confirmar("Entrenar lee todo el historial y puede tardar varios minutos. ¿Continuar?"):
             return
         actor = self._session.usuario
         self._vista.establecer_ocupado(True, "entrenar")
-        self._ejecutar(lambda: self._modelos.entrenar(actor, horizonte),
+        self._ejecutar(lambda: self._modelos.entrenar(actor, HORIZONTE),
                        al_terminar=self._al_entrenar, al_fallar=self._al_fallar_accion)
 
-    def comparar(self, horizonte: int) -> None:
+    def comparar(self) -> None:
         if self._vista.ocupado:
             return
         actor = self._session.usuario
         self._vista.establecer_ocupado(True, "comparar")
-        self._ejecutar(lambda: self._modelos.comparar(actor, horizonte),
-                       al_terminar=lambda filas: self._al_comparar(horizonte, filas),
+        self._ejecutar(lambda: self._modelos.comparar(actor, HORIZONTE),
+                       al_terminar=self._al_comparar,
                        al_fallar=self._al_fallar_accion)
 
     def activar(self, id_modelo: int) -> None:
         if self._vista.ocupado:
             return
-        if not self._vista.confirmar("¿Activar esta versión? Reemplaza a la que está activa para ese horizonte."):
+        if not self._vista.confirmar("¿Activar esta versión? Reemplaza a la que está activa."):
             return
         actor = self._session.usuario
         self._ejecutar(lambda: self._modelos.activar(actor, id_modelo),
@@ -82,9 +82,9 @@ class ModelosIAController(PanelController):
         self._vista.mostrar_exito(texto_resultado(resultado))
         self._pedir_estado()
 
-    def _al_comparar(self, horizonte: int, filas) -> None:
+    def _al_comparar(self, filas) -> None:
         self._vista.establecer_ocupado(False)
-        self._vista.mostrar_comparacion(horizonte, [(c.algoritmo, c.evaluacion) for c in filas])
+        self._vista.mostrar_comparacion([(c.algoritmo, c.evaluacion) for c in filas])
 
     def _al_fallar_accion(self, error: Exception) -> None:
         self._vista.establecer_ocupado(False)

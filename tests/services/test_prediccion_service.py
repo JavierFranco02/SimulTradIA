@@ -40,7 +40,7 @@ class PruebasPrediccionService(unittest.TestCase):
         self.servicio = PrediccionService(DatabaseFalsa(), repo_activos, self.precios, self.modelos,
                                           self.predicciones, self.almacen, ahora=ahora)
 
-    def _entrenar(self, horizonte=5):
+    def _entrenar(self, horizonte=1):
         self.assertTrue(self.entrenador.entrenar(ADMIN, horizonte).activado)
 
     def test_sin_modelo_activo_no_genera_nada(self):
@@ -55,7 +55,7 @@ class PruebasPrediccionService(unittest.TestCase):
             self.assertAlmostEqual(p.prob_alcista + p.prob_bajista + p.prob_lateral, 1.0, delta=0.001)
             self.assertAlmostEqual(p.confianza, max(p.prob_alcista, p.prob_bajista, p.prob_lateral))
             self.assertGreater(p.fecha_objetivo, p.generada_en)
-            self.assertEqual(p.horizonte_dias, 5)
+            self.assertEqual(p.horizonte_dias, 1)
         manana = AHORA + timedelta(days=1)
         self.reloj[0] = manana
         self.assertEqual(self.servicio.generar_predicciones().generadas, 3)
@@ -86,30 +86,28 @@ class PruebasPrediccionService(unittest.TestCase):
         for p in self.predicciones.predicciones:
             cierres = self.cierres[p.id_activo]
             i = len(cierres) - FUTURO - 1                                  # la vela de AYER
-            clase = etiquetar(cierres, 5)[i]
+            clase = etiquetar(cierres, 1)[i]
             self.assertEqual(p.direccion_real, DIRECCIONES[clase])
             self.assertEqual(p.acierto, p.direccion == p.direccion_real)
-            self.assertEqual(float(p.precio_resultado), cierres[i + 5])
+            self.assertEqual(float(p.precio_resultado), cierres[i + 1])
 
     def test_resumen_trae_modelo_senales_ordenadas_y_precision(self):
-        self.assertIsNone(self.servicio.resumen(5).modelo)
+        self.assertIsNone(self.servicio.resumen(1).modelo)
         self._entrenar()
         self.servicio.generar_predicciones()
-        resumen = self.servicio.resumen(5)
-        self.assertEqual(resumen.modelo.horizonte_dias, 5)
+        resumen = self.servicio.resumen(1)
+        self.assertEqual(resumen.modelo.horizonte_dias, 1)
         self.assertEqual(len(resumen.senales), 3)
         confianzas = [s.prediccion.confianza for s in resumen.senales]
         self.assertEqual(confianzas, sorted(confianzas, reverse=True))
         self.assertEqual(resumen.precision.evaluadas, 0)
-        self.assertEqual(self.servicio.resumen(3).senales, [])
 
     def test_detalle_trae_la_vigente_y_el_historial(self):
         self._entrenar()
         self.servicio.generar_predicciones()
-        detalle = self.servicio.detalle(1, 5)
+        detalle = self.servicio.detalle(1, 1)
         self.assertEqual(detalle.vigente.id_activo, 1)
         self.assertEqual(len(detalle.historial), 1)
-        self.assertIsNone(self.servicio.detalle(1, 3).vigente)
 
     def test_estado_del_ciclo_para_el_administrador(self):
         from simultradia.core.exceptions import ErrorPermisos

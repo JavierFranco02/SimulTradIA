@@ -79,9 +79,9 @@ class PruebasIAController(unittest.TestCase):
     def test_al_cargar_pide_el_resumen_elige_el_de_mas_confianza_y_pide_su_detalle(self):
         vista, servicio, controlador = self._crear()
         controlador.cargar()
-        self.assertEqual(servicio.llamadas, [("resumen", 5), ("detalle", 2, 5), ("proyectar", 2, 5, None)])
+        self.assertEqual(servicio.llamadas, [("resumen", 1), ("detalle", 2, 1), ("proyectar", 2, 5, None)])
         self.assertEqual(vista.de_tipo("seleccionar"), [("seleccionar", 2)])
-        self.assertEqual(vista.de_tipo("detalle"), [("detalle", "T2", 5)])
+        self.assertEqual(vista.de_tipo("detalle"), [("detalle", "T2", 1)])
         self.assertEqual([ms for ms, _ in vista.programadas], [60000])
 
     def test_el_refresco_no_vuelve_a_pedir_el_detalle_si_nada_cambio(self):
@@ -96,14 +96,6 @@ class PruebasIAController(unittest.TestCase):
         servicio.senales = [_senal(2, 0.7, id_prediccion=999), _senal(1, 0.5)]
         vista.programadas[-1][1]()
         self.assertEqual([l[0] for l in servicio.llamadas].count("detalle"), 2)
-
-    def test_cambiar_de_horizonte_limpia_pide_otro_resumen_y_conserva_el_activo(self):
-        vista, servicio, controlador = self._crear()
-        controlador.cargar()
-        vista.acciones["al_elegir_horizonte"](3)
-        self.assertLess(vista.eventos.index(("limpiar",)), vista.eventos.index(("resumen", 3)))
-        self.assertIn(("resumen", 3), servicio.llamadas)
-        self.assertEqual(servicio.llamadas[-2:], [("detalle", 2, 3), ("proyectar", 2, 5, None)])
 
     def test_sin_modelo_no_elige_nada(self):
         vista = VistaIAFalsa()
@@ -142,9 +134,10 @@ class PruebasIAController(unittest.TestCase):
         ejecutor = EjecutorDiferido()
         with mock.patch(_HILO, ejecutor):
             controlador.cargar()                     # resumen 1 (pendiente)
-            vista.acciones["al_elegir_horizonte"](3)  # resumen 2
+            vista.acciones["al_elegir_activo"](2)     # detalle y proyección en segundo plano
+            controlador.cargar()                      # resumen 2: el 1 ya no vale
             ejecutor.terminar_todo()
-        self.assertEqual(vista.de_tipo("resumen"), [("resumen", 3)])
+        self.assertEqual(len(vista.de_tipo("resumen")), 1)
 
     def test_si_la_pantalla_ya_no_existe_no_la_toca(self):
         vista, _, controlador = self._crear()
