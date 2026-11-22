@@ -2,7 +2,7 @@
 
 Simulador de trading e inversión con dinero virtual y precios reales. Aplicación de escritorio hecha con Python, ttkbootstrap y PostgreSQL.
 
-Incluye registro e inicio de sesión, **Mercado** (lista de activos y gráfico de velas con indicadores), **Operar** (órdenes a mercado y límite, stop-loss, take-profit y calculadora de riesgo), **Predicciones IA** (cuánto se moverá cada activo mañana) y un panel de **administración** (usuarios, activos, ingesta de datos y modelos de IA). Hay 30 activos: 5 criptomonedas (Binance) y 25 acciones, ETF, divisas, índices y bonos (Yahoo Finance).
+Incluye registro e inicio de sesión, **Mercado** (lista de activos y gráfico de velas con indicadores), **Operar** (órdenes a mercado y límite, stop-loss, take-profit y calculadora de riesgo) **Portafolio**, **Predicciones IA** (cuánto se moverá cada activo mañana) y un panel de **administración** (usuarios, activos, ingesta de datos y modelos de IA). Hay 30 activos: 5 criptomonedas (Binance) y 25 acciones, ETF, divisas, índices y bonos (Yahoo Finance).
 
 ## Predicciones IA (volatilidad)
 
