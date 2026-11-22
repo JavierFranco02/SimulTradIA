@@ -2,10 +2,6 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 9.3.5
--- Dumped by pg_dump version 9.3.5
--- Started on 2026-11-11 10:23:47
-
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET client_encoding = 'UTF8';
@@ -14,7 +10,6 @@ SET check_function_bodies = false;
 SET client_min_messages = warning;
 
 --
--- TOC entry 188 (class 3079 OID 11750)
 -- Name: plpgsql; Type: EXTENSION; Schema: -; Owner: 
 --
 
@@ -22,8 +17,6 @@ CREATE EXTENSION IF NOT EXISTS plpgsql WITH SCHEMA pg_catalog;
 
 
 --
--- TOC entry 2111 (class 0 OID 0)
--- Dependencies: 188
 -- Name: EXTENSION plpgsql; Type: COMMENT; Schema: -; Owner: 
 --
 
@@ -33,7 +26,33 @@ COMMENT ON EXTENSION plpgsql IS 'PL/pgSQL procedural language';
 SET search_path = public, pg_catalog;
 
 --
--- TOC entry 572 (class 1247 OID 90556)
+-- Name: direccion_prediccion; Type: TYPE; Schema: public; Owner: postgres
+--
+
+CREATE TYPE direccion_prediccion AS ENUM (
+    'alcista',
+    'bajista',
+    'lateral'
+);
+
+
+ALTER TYPE public.direccion_prediccion OWNER TO postgres;
+
+--
+-- Name: estado_modelo; Type: TYPE; Schema: public; Owner: postgres
+--
+
+CREATE TYPE estado_modelo AS ENUM (
+    'entrenando',
+    'activo',
+    'archivado',
+    'fallido'
+);
+
+
+ALTER TYPE public.estado_modelo OWNER TO postgres;
+
+--
 -- Name: estado_orden; Type: TYPE; Schema: public; Owner: postgres
 --
 
@@ -50,7 +69,20 @@ CREATE TYPE estado_orden AS ENUM (
 ALTER TYPE public.estado_orden OWNER TO postgres;
 
 --
--- TOC entry 548 (class 1247 OID 74194)
+-- Name: estado_proceso; Type: TYPE; Schema: public; Owner: postgres
+--
+
+CREATE TYPE estado_proceso AS ENUM (
+    'pendiente',
+    'ejecutando',
+    'completado',
+    'fallido'
+);
+
+
+ALTER TYPE public.estado_proceso OWNER TO postgres;
+
+--
 -- Name: intervalo_vela; Type: TYPE; Schema: public; Owner: postgres
 --
 
@@ -68,7 +100,6 @@ CREATE TYPE intervalo_vela AS ENUM (
 ALTER TYPE public.intervalo_vela OWNER TO postgres;
 
 --
--- TOC entry 566 (class 1247 OID 90539)
 -- Name: lado_orden; Type: TYPE; Schema: public; Owner: postgres
 --
 
@@ -81,7 +112,19 @@ CREATE TYPE lado_orden AS ENUM (
 ALTER TYPE public.lado_orden OWNER TO postgres;
 
 --
--- TOC entry 534 (class 1247 OID 65987)
+-- Name: nivel_volatilidad; Type: TYPE; Schema: public; Owner: postgres
+--
+
+CREATE TYPE nivel_volatilidad AS ENUM (
+    'baja',
+    'normal',
+    'alta'
+);
+
+
+ALTER TYPE public.nivel_volatilidad OWNER TO postgres;
+
+--
 -- Name: rol_usuario; Type: TYPE; Schema: public; Owner: postgres
 --
 
@@ -94,7 +137,6 @@ CREATE TYPE rol_usuario AS ENUM (
 ALTER TYPE public.rol_usuario OWNER TO postgres;
 
 --
--- TOC entry 545 (class 1247 OID 74180)
 -- Name: tipo_activo; Type: TYPE; Schema: public; Owner: postgres
 --
 
@@ -111,7 +153,20 @@ CREATE TYPE tipo_activo AS ENUM (
 ALTER TYPE public.tipo_activo OWNER TO postgres;
 
 --
--- TOC entry 569 (class 1247 OID 90544)
+-- Name: tipo_modelo_ia; Type: TYPE; Schema: public; Owner: postgres
+--
+
+CREATE TYPE tipo_modelo_ia AS ENUM (
+    'direccion',
+    'volatilidad',
+    'sentimiento',
+    'regimen'
+);
+
+
+ALTER TYPE public.tipo_modelo_ia OWNER TO postgres;
+
+--
 -- Name: tipo_orden; Type: TYPE; Schema: public; Owner: postgres
 --
 
@@ -131,7 +186,6 @@ SET default_tablespace = '';
 SET default_with_oids = false;
 
 --
--- TOC entry 175 (class 1259 OID 74211)
 -- Name: activos; Type: TABLE; Schema: public; Owner: postgres; Tablespace: 
 --
 
@@ -150,7 +204,6 @@ CREATE TABLE activos (
 ALTER TABLE public.activos OWNER TO postgres;
 
 --
--- TOC entry 174 (class 1259 OID 74209)
 -- Name: activos_id_activo_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
@@ -165,8 +218,6 @@ CREATE SEQUENCE activos_id_activo_seq
 ALTER TABLE public.activos_id_activo_seq OWNER TO postgres;
 
 --
--- TOC entry 2112 (class 0 OID 0)
--- Dependencies: 174
 -- Name: activos_id_activo_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
 
@@ -174,7 +225,6 @@ ALTER SEQUENCE activos_id_activo_seq OWNED BY activos.id_activo;
 
 
 --
--- TOC entry 177 (class 1259 OID 74237)
 -- Name: cotizaciones_actuales; Type: TABLE; Schema: public; Owner: postgres; Tablespace: 
 --
 
@@ -193,7 +243,6 @@ CREATE TABLE cotizaciones_actuales (
 ALTER TABLE public.cotizaciones_actuales OWNER TO postgres;
 
 --
--- TOC entry 173 (class 1259 OID 74156)
 -- Name: cuentas_simuladas; Type: TABLE; Schema: public; Owner: postgres; Tablespace: 
 --
 
@@ -220,7 +269,6 @@ CREATE TABLE cuentas_simuladas (
 ALTER TABLE public.cuentas_simuladas OWNER TO postgres;
 
 --
--- TOC entry 172 (class 1259 OID 74154)
 -- Name: cuentas_simuladas_id_cuenta_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
@@ -235,8 +283,6 @@ CREATE SEQUENCE cuentas_simuladas_id_cuenta_seq
 ALTER TABLE public.cuentas_simuladas_id_cuenta_seq OWNER TO postgres;
 
 --
--- TOC entry 2113 (class 0 OID 0)
--- Dependencies: 172
 -- Name: cuentas_simuladas_id_cuenta_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
 
@@ -244,7 +290,6 @@ ALTER SEQUENCE cuentas_simuladas_id_cuenta_seq OWNED BY cuentas_simuladas.id_cue
 
 
 --
--- TOC entry 183 (class 1259 OID 90596)
 -- Name: ejecuciones; Type: TABLE; Schema: public; Owner: postgres; Tablespace: 
 --
 
@@ -267,7 +312,6 @@ CREATE TABLE ejecuciones (
 ALTER TABLE public.ejecuciones OWNER TO postgres;
 
 --
--- TOC entry 182 (class 1259 OID 90594)
 -- Name: ejecuciones_id_ejecucion_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
@@ -282,8 +326,6 @@ CREATE SEQUENCE ejecuciones_id_ejecucion_seq
 ALTER TABLE public.ejecuciones_id_ejecucion_seq OWNER TO postgres;
 
 --
--- TOC entry 2114 (class 0 OID 0)
--- Dependencies: 182
 -- Name: ejecuciones_id_ejecucion_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
 
@@ -291,7 +333,59 @@ ALTER SEQUENCE ejecuciones_id_ejecucion_seq OWNED BY ejecuciones.id_ejecucion;
 
 
 --
--- TOC entry 179 (class 1259 OID 74250)
+-- Name: entrenamientos_modelo; Type: TABLE; Schema: public; Owner: postgres; Tablespace: 
+--
+
+CREATE TABLE entrenamientos_modelo (
+    id_entrenamiento bigint NOT NULL,
+    id_modelo bigint NOT NULL,
+    solicitado_por bigint,
+    estado estado_proceso DEFAULT 'pendiente'::estado_proceso NOT NULL,
+    metricas json DEFAULT '{}'::json NOT NULL,
+    mensaje_error text,
+    inicio_en timestamp with time zone DEFAULT now() NOT NULL,
+    fin_en timestamp with time zone
+);
+
+
+ALTER TABLE public.entrenamientos_modelo OWNER TO postgres;
+
+--
+-- Name: entrenamientos_modelo_id_entrenamiento_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE entrenamientos_modelo_id_entrenamiento_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.entrenamientos_modelo_id_entrenamiento_seq OWNER TO postgres;
+
+--
+-- Name: entrenamientos_modelo_id_entrenamiento_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE entrenamientos_modelo_id_entrenamiento_seq OWNED BY entrenamientos_modelo.id_entrenamiento;
+
+
+--
+-- Name: explicaciones_prediccion; Type: TABLE; Schema: public; Owner: postgres; Tablespace: 
+--
+
+CREATE TABLE explicaciones_prediccion (
+    id_prediccion bigint NOT NULL,
+    factor character varying(60) NOT NULL,
+    importancia numeric(8,6) NOT NULL,
+    valor_factor numeric(20,8)
+);
+
+
+ALTER TABLE public.explicaciones_prediccion OWNER TO postgres;
+
+--
 -- Name: fuentes_datos; Type: TABLE; Schema: public; Owner: postgres; Tablespace: 
 --
 
@@ -305,7 +399,6 @@ CREATE TABLE fuentes_datos (
 ALTER TABLE public.fuentes_datos OWNER TO postgres;
 
 --
--- TOC entry 178 (class 1259 OID 74248)
 -- Name: fuentes_datos_id_fuente_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
@@ -320,8 +413,6 @@ CREATE SEQUENCE fuentes_datos_id_fuente_seq
 ALTER TABLE public.fuentes_datos_id_fuente_seq OWNER TO postgres;
 
 --
--- TOC entry 2115 (class 0 OID 0)
--- Dependencies: 178
 -- Name: fuentes_datos_id_fuente_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
 
@@ -329,7 +420,50 @@ ALTER SEQUENCE fuentes_datos_id_fuente_seq OWNED BY fuentes_datos.id_fuente;
 
 
 --
--- TOC entry 187 (class 1259 OID 90651)
+-- Name: modelos_ia; Type: TABLE; Schema: public; Owner: postgres; Tablespace: 
+--
+
+CREATE TABLE modelos_ia (
+    id_modelo bigint NOT NULL,
+    nombre character varying(100) NOT NULL,
+    version character varying(30) NOT NULL,
+    tipo tipo_modelo_ia NOT NULL,
+    algoritmo character varying(60),
+    horizonte_dias integer,
+    parametros json DEFAULT '{}'::json NOT NULL,
+    metricas_entrenamiento json DEFAULT '{}'::json NOT NULL,
+    ruta_artefacto text,
+    estado estado_modelo DEFAULT 'entrenando'::estado_modelo NOT NULL,
+    entrenado_en timestamp with time zone,
+    creado_en timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT modelos_ia_horizonte_dias_check CHECK ((horizonte_dias > 0))
+);
+
+
+ALTER TABLE public.modelos_ia OWNER TO postgres;
+
+--
+-- Name: modelos_ia_id_modelo_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE modelos_ia_id_modelo_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.modelos_ia_id_modelo_seq OWNER TO postgres;
+
+--
+-- Name: modelos_ia_id_modelo_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE modelos_ia_id_modelo_seq OWNED BY modelos_ia.id_modelo;
+
+
+--
 -- Name: operaciones_cerradas; Type: TABLE; Schema: public; Owner: postgres; Tablespace: 
 --
 
@@ -351,7 +485,6 @@ CREATE TABLE operaciones_cerradas (
 ALTER TABLE public.operaciones_cerradas OWNER TO postgres;
 
 --
--- TOC entry 186 (class 1259 OID 90649)
 -- Name: operaciones_cerradas_id_operacion_cerrada_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
@@ -366,8 +499,6 @@ CREATE SEQUENCE operaciones_cerradas_id_operacion_cerrada_seq
 ALTER TABLE public.operaciones_cerradas_id_operacion_cerrada_seq OWNER TO postgres;
 
 --
--- TOC entry 2116 (class 0 OID 0)
--- Dependencies: 186
 -- Name: operaciones_cerradas_id_operacion_cerrada_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
 
@@ -375,7 +506,6 @@ ALTER SEQUENCE operaciones_cerradas_id_operacion_cerrada_seq OWNED BY operacione
 
 
 --
--- TOC entry 181 (class 1259 OID 90571)
 -- Name: ordenes; Type: TABLE; Schema: public; Owner: postgres; Tablespace: 
 --
 
@@ -408,7 +538,6 @@ CREATE TABLE ordenes (
 ALTER TABLE public.ordenes OWNER TO postgres;
 
 --
--- TOC entry 180 (class 1259 OID 90569)
 -- Name: ordenes_id_orden_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
@@ -423,8 +552,6 @@ CREATE SEQUENCE ordenes_id_orden_seq
 ALTER TABLE public.ordenes_id_orden_seq OWNER TO postgres;
 
 --
--- TOC entry 2117 (class 0 OID 0)
--- Dependencies: 180
 -- Name: ordenes_id_orden_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
 
@@ -432,7 +559,6 @@ ALTER SEQUENCE ordenes_id_orden_seq OWNED BY ordenes.id_orden;
 
 
 --
--- TOC entry 185 (class 1259 OID 90626)
 -- Name: posiciones; Type: TABLE; Schema: public; Owner: postgres; Tablespace: 
 --
 
@@ -457,7 +583,6 @@ CREATE TABLE posiciones (
 ALTER TABLE public.posiciones OWNER TO postgres;
 
 --
--- TOC entry 184 (class 1259 OID 90624)
 -- Name: posiciones_id_posicion_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
@@ -472,8 +597,6 @@ CREATE SEQUENCE posiciones_id_posicion_seq
 ALTER TABLE public.posiciones_id_posicion_seq OWNER TO postgres;
 
 --
--- TOC entry 2118 (class 0 OID 0)
--- Dependencies: 184
 -- Name: posiciones_id_posicion_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
 
@@ -481,7 +604,6 @@ ALTER SEQUENCE posiciones_id_posicion_seq OWNED BY posiciones.id_posicion;
 
 
 --
--- TOC entry 176 (class 1259 OID 74222)
 -- Name: precios_velas; Type: TABLE; Schema: public; Owner: postgres; Tablespace: 
 --
 
@@ -504,7 +626,127 @@ CREATE TABLE precios_velas (
 ALTER TABLE public.precios_velas OWNER TO postgres;
 
 --
--- TOC entry 171 (class 1259 OID 65993)
+-- Name: predicciones_direccion; Type: TABLE; Schema: public; Owner: postgres; Tablespace: 
+--
+
+CREATE TABLE predicciones_direccion (
+    id_prediccion bigint NOT NULL,
+    id_activo bigint NOT NULL,
+    id_modelo bigint NOT NULL,
+    generada_en timestamp with time zone DEFAULT now() NOT NULL,
+    horizonte_dias integer NOT NULL,
+    fecha_objetivo timestamp with time zone NOT NULL,
+    direccion direccion_prediccion NOT NULL,
+    prob_alcista numeric(5,4) NOT NULL,
+    prob_bajista numeric(5,4) NOT NULL,
+    prob_lateral numeric(5,4) NOT NULL,
+    confianza numeric(5,4) NOT NULL,
+    precio_referencia numeric(20,8) NOT NULL,
+    precio_resultado numeric(20,8),
+    direccion_real direccion_prediccion,
+    acierto boolean,
+    evaluada_en timestamp with time zone,
+    CONSTRAINT ck_probabilidades CHECK ((abs((((prob_alcista + prob_bajista) + prob_lateral) - (1)::numeric)) < 0.001)),
+    CONSTRAINT predicciones_direccion_confianza_check CHECK (((confianza >= (0)::numeric) AND (confianza <= (1)::numeric))),
+    CONSTRAINT predicciones_direccion_horizonte_dias_check CHECK ((horizonte_dias > 0)),
+    CONSTRAINT predicciones_direccion_prob_alcista_check CHECK (((prob_alcista >= (0)::numeric) AND (prob_alcista <= (1)::numeric))),
+    CONSTRAINT predicciones_direccion_prob_bajista_check CHECK (((prob_bajista >= (0)::numeric) AND (prob_bajista <= (1)::numeric))),
+    CONSTRAINT predicciones_direccion_prob_lateral_check CHECK (((prob_lateral >= (0)::numeric) AND (prob_lateral <= (1)::numeric)))
+);
+
+
+ALTER TABLE public.predicciones_direccion OWNER TO postgres;
+
+--
+-- Name: predicciones_direccion_id_prediccion_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE predicciones_direccion_id_prediccion_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.predicciones_direccion_id_prediccion_seq OWNER TO postgres;
+
+--
+-- Name: predicciones_direccion_id_prediccion_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE predicciones_direccion_id_prediccion_seq OWNED BY predicciones_direccion.id_prediccion;
+
+
+--
+-- Name: predicciones_volatilidad; Type: TABLE; Schema: public; Owner: postgres; Tablespace: 
+--
+
+CREATE TABLE predicciones_volatilidad (
+    id_prediccion bigint NOT NULL,
+    id_activo bigint NOT NULL,
+    id_modelo bigint NOT NULL,
+    generada_en timestamp with time zone DEFAULT now() NOT NULL,
+    fecha_objetivo timestamp with time zone NOT NULL,
+    precio_referencia numeric(20,8) NOT NULL,
+    rango_predicho numeric(10,6) NOT NULL,
+    rango_bajo numeric(10,6) NOT NULL,
+    rango_alto numeric(10,6) NOT NULL,
+    rango_hoy numeric(10,6) NOT NULL,
+    rango_normal numeric(10,6) NOT NULL,
+    umbral_bajo numeric(10,6) NOT NULL,
+    umbral_alto numeric(10,6) NOT NULL,
+    nivel nivel_volatilidad NOT NULL,
+    factores json DEFAULT '[]'::json NOT NULL,
+    rango_real numeric(10,6),
+    nivel_real nivel_volatilidad,
+    acierto_nivel boolean,
+    evaluada_en timestamp with time zone,
+    CONSTRAINT predicciones_volatilidad_rango_alto_check CHECK ((rango_alto > (0)::numeric)),
+    CONSTRAINT predicciones_volatilidad_rango_bajo_check CHECK ((rango_bajo > (0)::numeric)),
+    CONSTRAINT predicciones_volatilidad_rango_predicho_check CHECK ((rango_predicho > (0)::numeric))
+);
+
+
+ALTER TABLE public.predicciones_volatilidad OWNER TO postgres;
+
+--
+-- Name: predicciones_volatilidad_id_prediccion_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE predicciones_volatilidad_id_prediccion_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.predicciones_volatilidad_id_prediccion_seq OWNER TO postgres;
+
+--
+-- Name: predicciones_volatilidad_id_prediccion_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE predicciones_volatilidad_id_prediccion_seq OWNED BY predicciones_volatilidad.id_prediccion;
+
+
+--
+-- Name: snapshots_portafolio; Type: TABLE; Schema: public; Owner: postgres; Tablespace: 
+--
+
+CREATE TABLE snapshots_portafolio (
+    id_cuenta bigint NOT NULL,
+    momento timestamp with time zone NOT NULL,
+    saldo_disponible numeric(20,4) NOT NULL,
+    valor_posiciones numeric(20,4) NOT NULL,
+    patrimonio_total numeric(20,4) NOT NULL
+);
+
+
+ALTER TABLE public.snapshots_portafolio OWNER TO postgres;
+
+--
 -- Name: usuarios; Type: TABLE; Schema: public; Owner: postgres; Tablespace: 
 --
 
@@ -525,7 +767,6 @@ CREATE TABLE usuarios (
 ALTER TABLE public.usuarios OWNER TO postgres;
 
 --
--- TOC entry 170 (class 1259 OID 65991)
 -- Name: usuarios_id_usuario_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
@@ -540,8 +781,6 @@ CREATE SEQUENCE usuarios_id_usuario_seq
 ALTER TABLE public.usuarios_id_usuario_seq OWNER TO postgres;
 
 --
--- TOC entry 2119 (class 0 OID 0)
--- Dependencies: 170
 -- Name: usuarios_id_usuario_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
 
@@ -549,7 +788,6 @@ ALTER SEQUENCE usuarios_id_usuario_seq OWNED BY usuarios.id_usuario;
 
 
 --
--- TOC entry 1910 (class 2604 OID 74214)
 -- Name: id_activo; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -557,7 +795,6 @@ ALTER TABLE ONLY activos ALTER COLUMN id_activo SET DEFAULT nextval('activos_id_
 
 
 --
--- TOC entry 1899 (class 2604 OID 74159)
 -- Name: id_cuenta; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -565,7 +802,6 @@ ALTER TABLE ONLY cuentas_simuladas ALTER COLUMN id_cuenta SET DEFAULT nextval('c
 
 
 --
--- TOC entry 1933 (class 2604 OID 90599)
 -- Name: id_ejecucion; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -573,7 +809,13 @@ ALTER TABLE ONLY ejecuciones ALTER COLUMN id_ejecucion SET DEFAULT nextval('ejec
 
 
 --
--- TOC entry 1920 (class 2604 OID 74253)
+-- Name: id_entrenamiento; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY entrenamientos_modelo ALTER COLUMN id_entrenamiento SET DEFAULT nextval('entrenamientos_modelo_id_entrenamiento_seq'::regclass);
+
+
+--
 -- Name: id_fuente; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -581,7 +823,13 @@ ALTER TABLE ONLY fuentes_datos ALTER COLUMN id_fuente SET DEFAULT nextval('fuent
 
 
 --
--- TOC entry 1947 (class 2604 OID 90654)
+-- Name: id_modelo; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY modelos_ia ALTER COLUMN id_modelo SET DEFAULT nextval('modelos_ia_id_modelo_seq'::regclass);
+
+
+--
 -- Name: id_operacion_cerrada; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -589,7 +837,6 @@ ALTER TABLE ONLY operaciones_cerradas ALTER COLUMN id_operacion_cerrada SET DEFA
 
 
 --
--- TOC entry 1922 (class 2604 OID 90574)
 -- Name: id_orden; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -597,7 +844,6 @@ ALTER TABLE ONLY ordenes ALTER COLUMN id_orden SET DEFAULT nextval('ordenes_id_o
 
 
 --
--- TOC entry 1939 (class 2604 OID 90629)
 -- Name: id_posicion; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -605,7 +851,20 @@ ALTER TABLE ONLY posiciones ALTER COLUMN id_posicion SET DEFAULT nextval('posici
 
 
 --
--- TOC entry 1893 (class 2604 OID 65996)
+-- Name: id_prediccion; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY predicciones_direccion ALTER COLUMN id_prediccion SET DEFAULT nextval('predicciones_direccion_id_prediccion_seq'::regclass);
+
+
+--
+-- Name: id_prediccion; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY predicciones_volatilidad ALTER COLUMN id_prediccion SET DEFAULT nextval('predicciones_volatilidad_id_prediccion_seq'::regclass);
+
+
+--
 -- Name: id_usuario; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -613,7 +872,6 @@ ALTER TABLE ONLY usuarios ALTER COLUMN id_usuario SET DEFAULT nextval('usuarios_
 
 
 --
--- TOC entry 1958 (class 2606 OID 74219)
 -- Name: activos_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
 --
 
@@ -622,7 +880,6 @@ ALTER TABLE ONLY activos
 
 
 --
--- TOC entry 1960 (class 2606 OID 74221)
 -- Name: activos_ticker_key; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
 --
 
@@ -631,7 +888,6 @@ ALTER TABLE ONLY activos
 
 
 --
--- TOC entry 1964 (class 2606 OID 74242)
 -- Name: cotizaciones_actuales_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
 --
 
@@ -640,7 +896,6 @@ ALTER TABLE ONLY cotizaciones_actuales
 
 
 --
--- TOC entry 1954 (class 2606 OID 74173)
 -- Name: cuentas_simuladas_id_usuario_nombre_key; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
 --
 
@@ -649,7 +904,6 @@ ALTER TABLE ONLY cuentas_simuladas
 
 
 --
--- TOC entry 1956 (class 2606 OID 74171)
 -- Name: cuentas_simuladas_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
 --
 
@@ -658,7 +912,6 @@ ALTER TABLE ONLY cuentas_simuladas
 
 
 --
--- TOC entry 1974 (class 2606 OID 90606)
 -- Name: ejecuciones_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
 --
 
@@ -667,7 +920,22 @@ ALTER TABLE ONLY ejecuciones
 
 
 --
--- TOC entry 1966 (class 2606 OID 74258)
+-- Name: entrenamientos_modelo_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
+--
+
+ALTER TABLE ONLY entrenamientos_modelo
+    ADD CONSTRAINT entrenamientos_modelo_pkey PRIMARY KEY (id_entrenamiento);
+
+
+--
+-- Name: explicaciones_prediccion_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
+--
+
+ALTER TABLE ONLY explicaciones_prediccion
+    ADD CONSTRAINT explicaciones_prediccion_pkey PRIMARY KEY (id_prediccion, factor);
+
+
+--
 -- Name: fuentes_datos_nombre_key; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
 --
 
@@ -676,7 +944,6 @@ ALTER TABLE ONLY fuentes_datos
 
 
 --
--- TOC entry 1968 (class 2606 OID 74256)
 -- Name: fuentes_datos_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
 --
 
@@ -685,7 +952,22 @@ ALTER TABLE ONLY fuentes_datos
 
 
 --
--- TOC entry 1983 (class 2606 OID 90658)
+-- Name: modelos_ia_nombre_version_key; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
+--
+
+ALTER TABLE ONLY modelos_ia
+    ADD CONSTRAINT modelos_ia_nombre_version_key UNIQUE (nombre, version);
+
+
+--
+-- Name: modelos_ia_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
+--
+
+ALTER TABLE ONLY modelos_ia
+    ADD CONSTRAINT modelos_ia_pkey PRIMARY KEY (id_modelo);
+
+
+--
 -- Name: operaciones_cerradas_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
 --
 
@@ -694,7 +976,6 @@ ALTER TABLE ONLY operaciones_cerradas
 
 
 --
--- TOC entry 1972 (class 2606 OID 90582)
 -- Name: ordenes_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
 --
 
@@ -703,7 +984,6 @@ ALTER TABLE ONLY ordenes
 
 
 --
--- TOC entry 1978 (class 2606 OID 90638)
 -- Name: posiciones_id_cuenta_id_activo_key; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
 --
 
@@ -712,7 +992,6 @@ ALTER TABLE ONLY posiciones
 
 
 --
--- TOC entry 1980 (class 2606 OID 90636)
 -- Name: posiciones_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
 --
 
@@ -721,7 +1000,6 @@ ALTER TABLE ONLY posiciones
 
 
 --
--- TOC entry 1962 (class 2606 OID 74231)
 -- Name: precios_velas_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
 --
 
@@ -730,7 +1008,46 @@ ALTER TABLE ONLY precios_velas
 
 
 --
--- TOC entry 1952 (class 2606 OID 66005)
+-- Name: predicciones_direccion_id_activo_id_modelo_horizonte_dias_g_key; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
+--
+
+ALTER TABLE ONLY predicciones_direccion
+    ADD CONSTRAINT predicciones_direccion_id_activo_id_modelo_horizonte_dias_g_key UNIQUE (id_activo, id_modelo, horizonte_dias, generada_en);
+
+
+--
+-- Name: predicciones_direccion_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
+--
+
+ALTER TABLE ONLY predicciones_direccion
+    ADD CONSTRAINT predicciones_direccion_pkey PRIMARY KEY (id_prediccion);
+
+
+--
+-- Name: predicciones_volatilidad_id_activo_id_modelo_generada_en_key; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
+--
+
+ALTER TABLE ONLY predicciones_volatilidad
+    ADD CONSTRAINT predicciones_volatilidad_id_activo_id_modelo_generada_en_key UNIQUE (id_activo, id_modelo, generada_en);
+
+
+--
+-- Name: predicciones_volatilidad_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
+--
+
+ALTER TABLE ONLY predicciones_volatilidad
+    ADD CONSTRAINT predicciones_volatilidad_pkey PRIMARY KEY (id_prediccion);
+
+
+--
+-- Name: snapshots_portafolio_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
+--
+
+ALTER TABLE ONLY snapshots_portafolio
+    ADD CONSTRAINT snapshots_portafolio_pkey PRIMARY KEY (id_cuenta, momento);
+
+
+--
 -- Name: usuarios_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
 --
 
@@ -739,7 +1056,6 @@ ALTER TABLE ONLY usuarios
 
 
 --
--- TOC entry 1975 (class 1259 OID 90622)
 -- Name: idx_ejecuciones_cuenta; Type: INDEX; Schema: public; Owner: postgres; Tablespace: 
 --
 
@@ -747,7 +1063,6 @@ CREATE INDEX idx_ejecuciones_cuenta ON ejecuciones USING btree (id_cuenta, ejecu
 
 
 --
--- TOC entry 1976 (class 1259 OID 90623)
 -- Name: idx_ejecuciones_orden; Type: INDEX; Schema: public; Owner: postgres; Tablespace: 
 --
 
@@ -755,7 +1070,20 @@ CREATE INDEX idx_ejecuciones_orden ON ejecuciones USING btree (id_orden);
 
 
 --
--- TOC entry 1981 (class 1259 OID 90669)
+-- Name: idx_entrenamientos_modelo; Type: INDEX; Schema: public; Owner: postgres; Tablespace: 
+--
+
+CREATE INDEX idx_entrenamientos_modelo ON entrenamientos_modelo USING btree (id_modelo, inicio_en DESC);
+
+
+--
+-- Name: idx_modelos_ia_activos; Type: INDEX; Schema: public; Owner: postgres; Tablespace: 
+--
+
+CREATE INDEX idx_modelos_ia_activos ON modelos_ia USING btree (nombre) WHERE (estado = 'activo'::estado_modelo);
+
+
+--
 -- Name: idx_op_cerradas_cuenta; Type: INDEX; Schema: public; Owner: postgres; Tablespace: 
 --
 
@@ -763,7 +1091,6 @@ CREATE INDEX idx_op_cerradas_cuenta ON operaciones_cerradas USING btree (id_cuen
 
 
 --
--- TOC entry 1969 (class 1259 OID 90593)
 -- Name: idx_ordenes_cuenta; Type: INDEX; Schema: public; Owner: postgres; Tablespace: 
 --
 
@@ -771,7 +1098,6 @@ CREATE INDEX idx_ordenes_cuenta ON ordenes USING btree (id_cuenta, creada_en DES
 
 
 --
--- TOC entry 1970 (class 1259 OID 90681)
 -- Name: idx_ordenes_pendientes; Type: INDEX; Schema: public; Owner: postgres; Tablespace: 
 --
 
@@ -779,7 +1105,48 @@ CREATE INDEX idx_ordenes_pendientes ON ordenes USING btree (id_activo) WHERE (es
 
 
 --
--- TOC entry 1950 (class 1259 OID 66006)
+-- Name: idx_pred_dir_activo; Type: INDEX; Schema: public; Owner: postgres; Tablespace: 
+--
+
+CREATE INDEX idx_pred_dir_activo ON predicciones_direccion USING btree (id_activo, generada_en DESC);
+
+
+--
+-- Name: idx_pred_dir_pendientes; Type: INDEX; Schema: public; Owner: postgres; Tablespace: 
+--
+
+CREATE INDEX idx_pred_dir_pendientes ON predicciones_direccion USING btree (fecha_objetivo) WHERE (acierto IS NULL);
+
+
+--
+-- Name: idx_pred_vol_activo; Type: INDEX; Schema: public; Owner: postgres; Tablespace: 
+--
+
+CREATE INDEX idx_pred_vol_activo ON predicciones_volatilidad USING btree (id_activo, generada_en DESC);
+
+
+--
+-- Name: idx_pred_vol_pendientes; Type: INDEX; Schema: public; Owner: postgres; Tablespace: 
+--
+
+CREATE INDEX idx_pred_vol_pendientes ON predicciones_volatilidad USING btree (fecha_objetivo) WHERE (rango_real IS NULL);
+
+
+--
+-- Name: uq_pred_dir_una_por_dia; Type: INDEX; Schema: public; Owner: postgres; Tablespace: 
+--
+
+CREATE UNIQUE INDEX uq_pred_dir_una_por_dia ON predicciones_direccion USING btree (id_activo, id_modelo, horizonte_dias, ((timezone('UTC'::text, generada_en))::date));
+
+
+--
+-- Name: uq_pred_vol_una_por_dia; Type: INDEX; Schema: public; Owner: postgres; Tablespace: 
+--
+
+CREATE UNIQUE INDEX uq_pred_vol_una_por_dia ON predicciones_volatilidad USING btree (id_activo, id_modelo, ((timezone('UTC'::text, generada_en))::date));
+
+
+--
 -- Name: uq_usuarios_email; Type: INDEX; Schema: public; Owner: postgres; Tablespace: 
 --
 
@@ -787,7 +1154,6 @@ CREATE UNIQUE INDEX uq_usuarios_email ON usuarios USING btree (lower((email)::te
 
 
 --
--- TOC entry 1985 (class 2606 OID 74259)
 -- Name: activos_id_fuente_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -796,7 +1162,6 @@ ALTER TABLE ONLY activos
 
 
 --
--- TOC entry 1987 (class 2606 OID 74243)
 -- Name: cotizaciones_actuales_id_activo_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -805,7 +1170,6 @@ ALTER TABLE ONLY cotizaciones_actuales
 
 
 --
--- TOC entry 1984 (class 2606 OID 74174)
 -- Name: cuentas_simuladas_id_usuario_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -814,7 +1178,6 @@ ALTER TABLE ONLY cuentas_simuladas
 
 
 --
--- TOC entry 1992 (class 2606 OID 90617)
 -- Name: ejecuciones_id_activo_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -823,7 +1186,6 @@ ALTER TABLE ONLY ejecuciones
 
 
 --
--- TOC entry 1991 (class 2606 OID 90612)
 -- Name: ejecuciones_id_cuenta_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -832,7 +1194,6 @@ ALTER TABLE ONLY ejecuciones
 
 
 --
--- TOC entry 1990 (class 2606 OID 90607)
 -- Name: ejecuciones_id_orden_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -841,7 +1202,30 @@ ALTER TABLE ONLY ejecuciones
 
 
 --
--- TOC entry 1996 (class 2606 OID 90664)
+-- Name: entrenamientos_modelo_id_modelo_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY entrenamientos_modelo
+    ADD CONSTRAINT entrenamientos_modelo_id_modelo_fkey FOREIGN KEY (id_modelo) REFERENCES modelos_ia(id_modelo) ON DELETE CASCADE;
+
+
+--
+-- Name: entrenamientos_modelo_solicitado_por_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY entrenamientos_modelo
+    ADD CONSTRAINT entrenamientos_modelo_solicitado_por_fkey FOREIGN KEY (solicitado_por) REFERENCES usuarios(id_usuario) ON DELETE SET NULL;
+
+
+--
+-- Name: explicaciones_prediccion_id_prediccion_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY explicaciones_prediccion
+    ADD CONSTRAINT explicaciones_prediccion_id_prediccion_fkey FOREIGN KEY (id_prediccion) REFERENCES predicciones_direccion(id_prediccion) ON DELETE CASCADE;
+
+
+--
 -- Name: operaciones_cerradas_id_activo_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -850,7 +1234,6 @@ ALTER TABLE ONLY operaciones_cerradas
 
 
 --
--- TOC entry 1995 (class 2606 OID 90659)
 -- Name: operaciones_cerradas_id_cuenta_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -859,7 +1242,6 @@ ALTER TABLE ONLY operaciones_cerradas
 
 
 --
--- TOC entry 1989 (class 2606 OID 90588)
 -- Name: ordenes_id_activo_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -868,7 +1250,6 @@ ALTER TABLE ONLY ordenes
 
 
 --
--- TOC entry 1988 (class 2606 OID 90583)
 -- Name: ordenes_id_cuenta_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -877,7 +1258,6 @@ ALTER TABLE ONLY ordenes
 
 
 --
--- TOC entry 1993 (class 2606 OID 90644)
 -- Name: posiciones_id_activo_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -886,7 +1266,6 @@ ALTER TABLE ONLY posiciones
 
 
 --
--- TOC entry 1994 (class 2606 OID 90639)
 -- Name: posiciones_id_cuenta_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -895,7 +1274,6 @@ ALTER TABLE ONLY posiciones
 
 
 --
--- TOC entry 1986 (class 2606 OID 74232)
 -- Name: precios_velas_id_activo_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -904,8 +1282,46 @@ ALTER TABLE ONLY precios_velas
 
 
 --
--- TOC entry 2110 (class 0 OID 0)
--- Dependencies: 5
+-- Name: predicciones_direccion_id_activo_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY predicciones_direccion
+    ADD CONSTRAINT predicciones_direccion_id_activo_fkey FOREIGN KEY (id_activo) REFERENCES activos(id_activo) ON DELETE CASCADE;
+
+
+--
+-- Name: predicciones_direccion_id_modelo_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY predicciones_direccion
+    ADD CONSTRAINT predicciones_direccion_id_modelo_fkey FOREIGN KEY (id_modelo) REFERENCES modelos_ia(id_modelo);
+
+
+--
+-- Name: predicciones_volatilidad_id_activo_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY predicciones_volatilidad
+    ADD CONSTRAINT predicciones_volatilidad_id_activo_fkey FOREIGN KEY (id_activo) REFERENCES activos(id_activo) ON DELETE CASCADE;
+
+
+--
+-- Name: predicciones_volatilidad_id_modelo_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY predicciones_volatilidad
+    ADD CONSTRAINT predicciones_volatilidad_id_modelo_fkey FOREIGN KEY (id_modelo) REFERENCES modelos_ia(id_modelo);
+
+
+--
+-- Name: snapshots_portafolio_id_cuenta_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY snapshots_portafolio
+    ADD CONSTRAINT snapshots_portafolio_id_cuenta_fkey FOREIGN KEY (id_cuenta) REFERENCES cuentas_simuladas(id_cuenta) ON DELETE CASCADE;
+
+
+--
 -- Name: public; Type: ACL; Schema: -; Owner: postgres
 --
 
@@ -914,8 +1330,6 @@ REVOKE ALL ON SCHEMA public FROM postgres;
 GRANT ALL ON SCHEMA public TO postgres;
 GRANT ALL ON SCHEMA public TO PUBLIC;
 
-
--- Completed on 2026-11-11 10:23:47
 
 --
 -- PostgreSQL database dump complete

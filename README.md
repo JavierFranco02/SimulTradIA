@@ -2,7 +2,17 @@
 
 Simulador de trading e inversión con dinero virtual y precios reales. Aplicación de escritorio hecha con Python, ttkbootstrap y PostgreSQL.
 
-Incluye registro e inicio de sesión, **Mercado** (lista de activos y gráfico de velas con indicadores), **Operar** (órdenes a mercado y límite, stop-loss, take-profit y calculadora de riesgo) y un panel de **administración** (usuarios, activos e ingesta de datos). Hay 30 activos: 5 criptomonedas (Binance) y 25 acciones, ETF, divisas, índices y bonos (Yahoo Finance).
+Incluye registro e inicio de sesión, **Mercado** (lista de activos y gráfico de velas con indicadores), **Operar** (órdenes a mercado y límite, stop-loss, take-profit y calculadora de riesgo), **Predicciones IA** (cuánto se moverá cada activo mañana) y un panel de **administración** (usuarios, activos, ingesta de datos y modelos de IA). Hay 30 activos: 5 criptomonedas (Binance) y 25 acciones, ETF, divisas, índices y bonos (Yahoo Finance).
+
+## Predicciones IA (volatilidad)
+
+La IA no predice si el precio sube o baja: predice **cuánto se moverá** mañana, es decir, el rango `(máximo − mínimo) / cierre` de la próxima vela diaria. Para cada uno de los 30 activos muestra el rango esperado en %, un intervalo de ~80 % de probabilidad, el nivel (**baja / normal / alta**, según los últimos 90 días del mismo activo) y los datos que más pesaron.
+
+- El modelo (LightGBM) solo queda **activo** si le gana, con z ≥ 1,65, a dos bases simples: «repetir el rango de hoy» y «el promedio de los últimos 20 días». Si no, queda archivado y no genera predicciones.
+- Cada predicción se compara después con la vela real; el resultado se ve en la pestaña *Registro vs. realidad*.
+- Los días de una vela son los de **UTC**: la vela diaria empieza a las 00:00 UTC (21:00 del día anterior en UTC−3). La app muestra «se comprueba con la vela del lun 23/11», no una hora local.
+- Entrenar: Administración → Modelos de IA → *Entrenar y evaluar* (solo administrador). El worker genera las predicciones del día y evalúa las vencidas.
+- Estimación estadística con fines educativos; no es asesoría financiera.
 
 > No es asesoría financiera. Todo el dinero es virtual.
 
@@ -79,7 +89,7 @@ Para crear otro administrador: `python scripts/crear_admin.py`. Los usuarios nor
 
 Se necesitan dos terminales con el entorno virtual activado.
 
-**Terminal 1: worker.** Mantiene los precios y las velas al día y ejecuta las órdenes pendientes, los stop-loss y los take-profit. Déjalo corriendo mientras uses la app.
+**Terminal 1: worker.** Mantiene los precios y las velas al día y ejecuta las órdenes pendientes, los stop-loss y los take-profit; también genera las predicciones de volatilidad del día y evalúa las vencidas. Déjalo corriendo mientras uses la app.
 
 ```
 python worker.py

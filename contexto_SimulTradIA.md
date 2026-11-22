@@ -3,7 +3,7 @@
 Instrucciones permanentes para Claude. El **código está en los archivos del proyecto** y es la fuente de verdad;
 este documento explica qué es el proyecto, cómo está organizado y cómo trabajar en él.
 **La base de datos real NO se describe del todo en el repo:** `database/schema.sql` es solo una guía;
-`database/mercado.sql`, `operar.sql`, `operar_fase2.sql` y `portafolio.sql` crean las tablas reales de Mercado, Operar y Portafolio (ver sección 8).
+`database/mercado.sql`, `operar.sql` y `operar_fase2.sql` crean las tablas reales de Mercado y de Operar (ver sección 7).
 El estado actual y lo que falta están en la sección 11. **Las reglas de diseño de la interfaz (qué se decidió y por qué)
 están en la sección 5: léela antes de tocar cualquier pantalla.**
 
@@ -39,7 +39,7 @@ Sin apalancamiento, sin margen y solo posiciones largas (vender cierra o reduce 
 editar el nombre, desactivar, **elegir, probar y cambiar su fuente de datos**) · ingesta de datos (estado, fuentes, probar conexión,
 ejecución manual de todo o de una fuente) · **contraseña temporal** para quien olvidó la suya ·
 modelos de IA (métricas, precisión real, reentrenar, activar o revertir versión) · glosario · panel de resumen ·
-auditoría. El admin nunca ve contraseñas ni opera dentro de la cuenta de un usuario (ni ve las pantallas Operar y Portafolio); sus
+auditoría. El admin nunca ve contraseñas ni opera dentro de la cuenta de un usuario (ni ve la pantalla Operar); sus
 permisos se validan en los servicios, no solo ocultando botones; el primer admin se crea por script
 (`scripts/crear_admin.py`), nunca desde el registro público.
 
@@ -88,13 +88,13 @@ apalancamiento, guardar configuraciones de gráfico, exportar PDF/CSV.
 6. **No compliques.** Nada de archivos o abstracciones sin uso real, ni ajustes, reglas o estilos para
    valores que se usan en un solo lugar. **Interfaz:** ver sección 5.
 7. **El esquema SQL es una guía, no la base real.** Antes de escribir SQL o entidades que toquen una tabla,
-   confirma con el usuario qué columnas tiene realmente; no asumas lo que dice `schema.sql`. Las tablas de Mercado, de
-   Operar y de Portafolio sí están definidas en `database/mercado.sql`, `operar.sql`, `operar_fase2.sql` y `portafolio.sql` (y hay un volcado
-   `database/simultradia_esquema.sql` de la base real, de noviembre de 2026, anterior a `portafolio.sql`).
-8. **Verifica y sé honesto con lo verificado.** Ejecuta las pruebas (sección 9). Tu entorno normalmente no
+   confirma con el usuario qué columnas tiene realmente; no asumas lo que dice `schema.sql`. Las tablas de Mercado y
+   de Operar sí están definidas en `database/mercado.sql`, `operar.sql` y `operar_fase2.sql` (y hay un volcado
+   `database/simultradia_esquema.sql` de la base real, de noviembre de 2026).
+8. **Verifica y sé honesto con lo verificado.** Ejecuta las pruebas (sección 8). Tu entorno normalmente no
    tiene tkinter, ttkbootstrap, psycopg2, ccxt ni yfinance, ni red: lo que simules valida lógica y cableado, **no la
    apariencia real, ni la conexión real a PostgreSQL, Binance o Yahoo**. El dibujo del gráfico sí se puede probar
-   (matplotlib sin tkinter; se puede generar una imagen y mirarla). Dilo siempre que aplique. **Las vistas de tkinter solo se compilan, no se ejecutan:** ya
+   (matplotlib sin tkinter). Dilo siempre que aplique. **Las vistas de tkinter solo se compilan, no se ejecutan:** ya
    hubo errores que las pruebas no podían ver (una variable reutilizada al armar un ticket; un widget que otro método
    usaba antes de crearse, al cambiar el orden de armado). En métodos largos que arman widgets, usa un nombre distinto
    para cada cosa, revisa los `return` y comprueba el ORDEN de creación entre métodos que se llaman entre sí.
@@ -103,8 +103,7 @@ apalancamiento, guardar configuraciones de gráfico, exportar PDF/CSV.
    dudas. El mockup debe usar SOLO lo que ttkbootstrap puede dibujar (sección 5.4): mismo tema, misma fuente,
    esquinas rectas, sin íconos. Solo cuando el usuario aprueba (a veces tras varias vueltas) se pasa a código. Cuando
    pida un cambio, **di qué archivos tocaría** y qué cosas no se pueden hacer. Cuando una pantalla se vea mal, pide o
-   usa su captura: la apariencia no se puede verificar sin verla. (Un ajuste chico ya descrito y aprobado con palabras,
-   como reordenar tablas, puede pasar directo a código si el usuario lo pide.)
+   usa su captura: la apariencia no se puede verificar sin verla.
 
 ---
 
@@ -149,8 +148,8 @@ Vista ──callbacks (vincular_acciones)──► Controlador ──► Servici
 | **Servicio** (`services`) | Reglas de negocio y **validaciones**. Abre la transacción y llama a **repositorios** y **clientes** (combina repositorios, no llama transacciones de otros servicios). Los métodos de administración y de operar reciben el `actor` y llaman a `exigir_admin` / `exigir_operador`. | Conocer tkinter o escribir SQL. Llamar a una API externa con una conexión de BD abierta. |
 | **Repositorio** (`repositories`) | **Único lugar con SQL.** Convierte filas en entidades leyendo por **nombre de columna**. | Reglas de negocio. Concatenar SQL con datos: siempre parámetros `%s`. |
 | **Cliente** (`clients`) | Adaptador a una API externa: **solo trae datos** y los devuelve como entidades. Declara qué tipos de activo ofrece (`TIPOS`), cómo se escriben sus tickers (`PATRON_TICKER`, `EJEMPLO_TICKER`), su `NOMBRE` (igual al de la tabla `fuentes_datos`) y su ritmo (`segundos_entre_cotizaciones`, `segundos_entre_velas`). | Escribir en la BD o decidir algo. |
-| **Dominio** (`domain`) | Entidades (`dataclass`), enums y `reglas/` (reglas y parámetros puros compartidos: intervalos, indicadores, operaciones, portafolio...). Python puro. | Depender de nada. |
-| **Análisis** (`analisis`) | Cálculo puro sobre series y velas: agrupar velas, aplicar el precio en vivo, SMA, EMA, Bollinger, RSI, MACD, ATR, y las métricas de riesgo de la curva de capital (caída, volatilidad, Sharpe). | BD, red o interfaz. |
+| **Dominio** (`domain`) | Entidades (`dataclass`), enums y `reglas/` (reglas y parámetros puros compartidos: intervalos, indicadores, operaciones...). Python puro. | Depender de nada. |
+| **Análisis** (`analisis`) | Cálculo puro sobre series y velas: agrupar velas, aplicar el precio en vivo, SMA, EMA, Bollinger, RSI, MACD, ATR. | BD, red o interfaz. |
 | **Núcleo** (`core`) | Herramientas técnicas reutilizables: ajustes, conexión, seguridad, sesión, excepciones, logging. Puede usar `domain`. | Conocer el negocio; importar `services`, `repositories` o `iu`; usar tkinter. |
 | **Composición** (`composition.py`, `main.py`, `worker.py`) | `crear_servicios(db)` arma servicios + repositorios + clientes en UN lugar (lo usan `main.py`, `worker.py` y `scripts/`). `main.py` crea la BD y la entrega a `App`. | |
 | **App y Navegador** (`app.py`, `iu/navegacion.py`) | `App` es la ventana: crea `Session` y `Navegador`. El Navegador cambia de pantalla por nombre. | |
@@ -159,15 +158,13 @@ Vista ──callbacks (vincular_acciones)──► Controlador ──► Servici
 ```
 main.py              arranque de la app con ventanas (crea BD y servicios)
 worker.py            proceso SIN ventanas (python worker.py): cada 2 s precios y, con ellos, órdenes pendientes y
-                     stop-loss/take-profit; cada 60 s velas y la foto del patrimonio de cada cuenta (Portafolio);
-                     cada fuente a su ritmo. Solo programa los jobs
+                     stop-loss/take-profit; cada 60 s velas; cada fuente a su ritmo. Solo programa los jobs
 scripts/             programas que se ejecutan a mano (p. ej. crear_admin.py)
 database/            schema.sql = GUÍA (no es la base real) · mercado.sql = tablas REALES de Mercado
                      (fuentes_datos, activos, precios_velas, cotizaciones_actuales) + 30 activos ·
                      operar.sql = tablas REALES de Operar (ordenes, ejecuciones, posiciones, operaciones_cerradas +
                      tipos lado_orden, tipo_orden, estado_orden) · operar_fase2.sql = una sola vez: columnas de
-                     límite/stop-loss/take-profit (se puede borrar) · portafolio.sql = tabla REAL de Portafolio
-                     (snapshots_portafolio; se ejecuta una vez) · mercado_actualizar.sql y
+                     límite/stop-loss/take-profit (se puede borrar) · mercado_actualizar.sql y
                      usuarios_password_temporal.sql = una sola vez, ya usados (se pueden borrar) ·
                      simultradia_esquema.sql = volcado (pg_dump) de la base real
 pyproject.toml       paquete instalable (pip install -e .) y dependencias
@@ -178,23 +175,19 @@ src/simultradia/
   core/              settings, db, security, session, exceptions, logging_config
   domain/            enums.py (RolUsuario, TipoActivo, IntervaloVela, LadoOrden, TipoOrden, EstadoOrden)
                      entities/ (*_entity.py: usuario, cuenta_simulada, activo, fuente, cotizacion [+ ActivoCotizado,
-                       PanelMercado], vela, posicion, orden [+ Ejecucion], operacion_cerrada [+ ticker opcional],
-                       snapshot [SnapshotPortafolio])
+                       PanelMercado], vela, posicion, orden [+ Ejecucion], operacion_cerrada)
                      reglas/ (intervalos.py: qué se guarda y qué se deriva; indicadores.py: parámetros [incluye ATR];
-                       operaciones.py: comisión, deslizamiento, compra/venta, estimación, riesgo, disparadores;
-                       portafolio.py: rentabilidad, exposición y estadísticas de las operaciones cerradas)
-  repositories/      usuario, cuenta [+ listar_operables], activo, fuente, precio, posicion [+ operaciones_cerradas],
-                     orden [+ ejecuciones], snapshot
+                       operaciones.py: comisión, deslizamiento, compra/venta, estimación, riesgo, disparadores)
+  repositories/      usuario, cuenta, activo, fuente, precio, posicion [+ operaciones_cerradas], orden [+ ejecuciones]
   services/          usuario_service (login, registro) · usuario_admin_service · mercado_service · grafico_service ·
-                     ingesta_service · activo_admin_service · fuente_admin_service · operar_service · portafolio_service ·
-                     permisos.py · validacion.py
+                     ingesta_service · activo_admin_service · fuente_admin_service · operar_service · permisos.py ·
+                     validacion.py
   clients/           binance_client.py (ccxt), yahoo_client.py (yfinance): solo traen datos
   analisis/          velas.py (agrupar, aplicar precio, velas_cerradas), indicadores.py (SMA, EMA, Bollinger, RSI, MACD, ATR), volatilidad.py (22 features y objetivo del rango), montecarlo.py
   backtesting/       (previsto) motor de simulación puro (sin BD ni UI)
   jobs/              actualizar_cotizaciones_job.py, actualizar_velas_job.py, evaluar_ordenes_job.py, generar_volatilidad_job.py, evaluar_volatilidad_job.py (el worker los repite; los de IA, cada hora)
   ia/                volatilidad.py (dataset, walk-forward, bases, z, calibración, explicar, predecir), volatilidad_serializacion.py (Evaluacion <-> dict JSON), almacen.py (archivos del modelo en `modelos/`, ignorada por git)
   experimental/      direccion/: la IA de dirección (features, entrenamiento, servicios, repositorio, jobs, pantallas y administración) apartada. NO la importa la app ni el worker; sus pruebas están en tests/experimental/ y siguen corriendo
-
   iu/                interfaz de usuario, agrupada por funcionalidad
     styles.py        Fonts (incluye VALUE), Colors, Palette (SOLO gráfico y tabla), ButtonStyle (incluye SUCCESS),
                      Spacing, y `texto_normal(boton)` para los toggles
@@ -204,7 +197,7 @@ src/simultradia/
     rutas.py         registra las pantallas de todos los módulos
     components/      clases reutilizables: ActionButton, BarList (barras con Canvas), Card, Medidor (barra 0–1 con marca de referencia), Seccion (recuadro con título y explicación), FigureView (figura matplotlib genérica), MetricGrid (cifras en cuadrícula), FormField, PasswordField, ShowPasswordToggle,
                      StatusMessage (solo errores de formulario), DataTable, SelectField, ScrollFrame, Dialogo (base de ventanas emergentes),
-                     CandleChart (+ candle_render.py: dibuja con matplotlib, sin tkinter), EquityChart (+ equity_render.py: curva de capital y caída, también sin tkinter)
+                     CandleChart (+ candle_render.py: dibuja con matplotlib, sin tkinter)
     base/            FormView/FormController (formularios, dibujados dentro de una tarjeta con borde) y PanelView/PanelController (secciones)
 
     auth/            login, registro y cambio de contraseña temporal (vistas, controladores, pantallas.py)
@@ -216,12 +209,9 @@ src/simultradia/
                      ia_controller, senal_view (pestaña Volatilidad), proyeccion_view, evaluacion_view, registro_view, textos.py (textos y
                      reglas de presentación, puro), graficos.py (abanico de Monte Carlo, error por periodo contra las dos bases y predicho vs. real; matplotlib puro). La volatilidad NO usa verde/rojo (no es bueno ni malo): solo los aciertos/fallos del registro
     operar/          operar_view (ticket a la derecha + gráfico + pestañas), operar_controller, proteccion_dialog (SL/TP), pantallas.py
-    portafolio/      portafolio_view (franja de cifras + curva + tablas Riesgo y Operaciones; pestaña de operaciones
-                     cerradas), portafolio_controller, pantallas.py
     admin/           usuarios, activos, ingesta, modelos_ia (entrenar, versiones, comparar algoritmos): cada uno con su vista y su controlador;
                      activo_dialogs.py = ventanas emergentes de Activos (agregar y editar el nombre)
     <módulo>/        backtesting/, portafolio/... cuando lleguen
-
 ```
 **(previsto)** = la carpeta existe solo con su `__init__.py` y un docstring; se llena cuando llegue su módulo.
 Cada módulo de `iu/` tiene su `pantallas.py` con `registrar(navegador)`; `iu/rutas.py` los junta.
@@ -235,14 +225,14 @@ El paquete se llama **`simultradia`** (no `main`: chocaría con `main.py`).
   resultado vuelve por una cola que `iniciar_revision(root)` (en `iu/background.py`) vacía cada 100 ms.
   `FormController._ejecutar` y `PanelController._ejecutar` descartan tanto el **éxito como el error** si
   `vista.esta_viva()` es falso (el usuario ya cambió de pantalla). **El pool de conexiones es de 5:** una pantalla
-  que refresca no debe lanzar varias consultas a la vez (por eso Operar y Portafolio piden todo su estado en UNA llamada).
+  que refresca no debe lanzar varias consultas a la vez (por eso Operar pide todo su estado en UNA llamada).
 - **Navegador y shell:** `Navegador.ir_a(nombre, **parametros)` (lo reciben los controladores). Hay pantallas
   **a ventana completa** (login, registro, home) y **secciones** (`en_shell=True`) que se dibujan dentro del área
   de contenido del shell (`home`), con el menú lateral fijo. Cada pantalla se registra con una **fábrica**
   `(padre, navegador, **parametros) -> vista` que arma vista + controlador y usa `navegador.servicios` y
   `navegador.session`. El tamaño de la ventana lo declara cada ruta (`tamano`, `minimo`; el shell: 1280×780, mínimo
   900×600). Una vista de shell expone `contenido` y `marcar_seccion(nombre)`. El menú está en
-  `iu/shell/pantallas.py` (`_MENU`, con marca de solo admin; `_SOLO_USUARIOS` oculta secciones al admin: Operar y Portafolio).
+  `iu/shell/pantallas.py` (`_MENU`, con marca de solo admin; `_SOLO_USUARIOS` oculta secciones al admin, como Operar).
   Mercado abre Operar con un activo ya elegido: `navegador.ir_a("operar", id_activo=5)`. **El menú lateral se queda
   como está** (decisión 52).
 - **Contraseña temporal:** el admin NUNCA ve la contraseña real de nadie. `UsuarioAdminService.restablecer_password`
@@ -266,12 +256,12 @@ El paquete se llama **`simultradia`** (no `main`: chocaría con `main.py`).
   (Activos, Operar/SL-TP) sobreescriben `_padre_aviso()` para abrir el diálogo sobre la ventana emergente si hay una abierta.
   Un estado que se repite en cada refresco (p. ej. "Sin precios todavía" en la lista de Mercado) NO es un aviso: va como
   texto en la propia pantalla (el pie de la lista). En los **refrescos periódicos** (lista y gráfico de Mercado, estado de
-  Ingesta, Portafolio) un fallo que se mantiene se avisa UNA sola vez: `PanelController._avisar_una_vez(clave, error)` y
+  Ingesta) un fallo que se mantiene se avisa UNA sola vez: `PanelController._avisar_una_vez(clave, error)` y
   `_recuperado(clave)`; si no, saldría un diálogo cada pocos segundos. La confirmación "¡Cuenta creada!" del login
   también es un diálogo. Los formularios siguen mostrando el error de cada campo bajo su campo y el error general en
   el propio formulario (`StatusMessage`, que solo muestra errores).
 - **Permisos:** los métodos de administración reciben `actor: Usuario` (el controlador pasa `session.usuario`) y
-  llaman a `exigir_admin(actor)` (`services/permisos.py`), que lanza `ErrorPermisos`. Operar y Portafolio usan `exigir_operador(actor)`:
+  llaman a `exigir_admin(actor)` (`services/permisos.py`), que lanza `ErrorPermisos`. Operar usa `exigir_operador(actor)`:
   rechaza al admin y a quien no ha iniciado sesión.
 - **Transacciones:** `with db.obtener_conexion() as conn:` presta una conexión; commit al salir bien, rollback
   si falla, y siempre la devuelve al pool. Todo lo hecho dentro es una sola operación (p. ej. el registro crea
@@ -393,40 +383,6 @@ El paquete se llama **`simultradia`** (no `main`: chocaría con `main.py`).
     el gráfico lo maneja su propio `GraficoController`, al que `pantallas.py` conecta. **Orden de armado en `OperarView.__init__`:**
     el ticket se crea ANTES que el centro, porque `_crear_tablas` termina llamando a `_actualizar_botones`, que lee
     `_boton_enviar` (creado en el ticket).
-- **Portafolio (servicio, fotos y métricas):** `PortafolioService` (solo para quien opera: `exigir_operador`).
-  - **La curva de capital** sale de `snapshots_portafolio` (clave `id_cuenta` + `momento`): una foto por MINUTO con saldo,
-    valor de las posiciones y patrimonio. La guardan (a) el worker cada 60 s para todas las cuentas (`guardar_snapshots`, vía
-    `jobs/guardar_snapshots_job.py`, después de actualizar precios) y (b) `obtener_portafolio` al abrir la pantalla y en cada
-    refresco (reescribe la fila del minuto), así la curva avanza aunque el worker esté apagado (con el worker apagado los precios
-    no cambian; solo cambian las operaciones). Si la primera foto es posterior a la creación de la cuenta, la curva arranca con
-    el capital inicial en `creada_en`. NO se reconstruye el pasado. Las posiciones sin precio se valoran a lo que costaron.
-  - **Compactación:** una vez por hora el worker deja, de lo que tiene más de 7 días, UNA foto por hora (la última), con una
-    función de ventana (`SnapshotRepository.compactar`). Sin esto serían ~500 000 filas por cuenta al año.
-  - **Métricas** (en `analisis/metricas.py` y `domain/reglas/portafolio.py`, Python puro; las mismas servirán a Backtesting):
-    rentabilidad (contra el capital inicial), exposición (parte del patrimonio invertida), caída máxima (peor bajada desde un
-    máximo de la curva), volatilidad anual y ratio de Sharpe (sobre los retornos diarios, tomando el último valor de cada día UTC;
-    sin tasa libre de riesgo; `None` con menos de 20 días de historial o sin movimiento; 365 días al año) y estadísticas de las
-    operaciones cerradas (tasa de aciertos, factor de beneficio, ganancia y pérdida media, por operación, mejor/peor).
-    **Operación cerrada = una venta**, parcial o total; ganadora = ganancia realizada > 0. Las comisiones pagadas suman las de las
-    ventas cerradas y las de compra de lo que aún se tiene.
-  - `obtener_portafolio` entrega TODO en una conexión (cifras, curva con sus caídas, métricas, operaciones con su ganancia %).
-- **Portafolio (pantalla):** título «Portafolio» y un `ttk.Notebook` con dos pestañas.
-  - **Resumen:** arriba una franja de seis cifras (Patrimonio, Rentabilidad, Saldo disponible, En posiciones, P&L no realizado,
-    P&L realizado; rótulo pequeño + cifra en `VALUE`, verde/rojo en las que tienen signo). Debajo, a la izquierda, los toggles de
-    rango **1 día / 1 sem / 1 mes / Todo (empieza en «1 día»)** y la curva con la **caída desde el máximo** en un panel debajo;
-    a la derecha, dos tablas pequeñas apiladas: **«Riesgo»** (Caída máxima, Volatilidad anual, Ratio de Sharpe, Exposición) y
-    **«Operaciones»** (Operaciones cerradas, Tasa de aciertos, Factor de beneficio, Ganancia media, Pérdida media, Por operación,
-    Mejor / peor, Comisiones pagadas), con una nota de que volatilidad y Sharpe necesitan 20 días. Lo que no se puede calcular sale «—».
-  - **Operaciones cerradas:** cada venta con ganancia y %, de la más nueva a la más vieja (sin ordenar por columna todavía). Las
-    posiciones abiertas y las órdenes siguen en Operar: Portafolio solo mide.
-  - **Gráfico (`EquityChart` + `equity_render.dibujar_curva`, sin Tk, probable en pruebas):** la línea es verde si el patrimonio
-    está sobre el capital inicial y roja si está debajo. **La escala vertical se ajusta al mínimo y máximo de lo visible** (con un
-    8 % de margen), no empieza en 0; la línea punteada del capital inicial solo se dibuja si cae dentro de esa escala (si no,
-    estiraría el eje y aplastaría la curva). El eje horizontal es TIEMPO REAL, con marcas en horas o días redondos y sus
-    etiquetas bajo CADA panel: si las marcas distan menos de un día, la hora («15:00») y, al cambiar el día, debajo la fecha
-    («15 nov»); si distan un día o más, la fecha y, al cambiar el año, el año. La línea de datos al pasar el mouse trae fecha, hora,
-    patrimonio, saldo y posiciones. El rango solo cambia cómo se dibuja (no pide nada al servicio).
-  - `PortafolioController` pide el resumen cada 15 s, una consulta a la vez; el fallo repetido se avisa una sola vez.
 
 ### 4.4 Para agregar una pantalla
 **Formulario:**
@@ -447,7 +403,7 @@ periódicos se encadenan con `vista.programar` y comprueban `esta_viva()`.
 
 ## 5. Diseño de la interfaz (reglas decididas con el usuario)
 
-Esta sección resume lo acordado en el rediseño de Mercado y Operar (noviembre de 2026) y en Portafolio. Se sigue en toda pantalla nueva.
+Esta sección resume lo acordado en el rediseño de Mercado y Operar (noviembre de 2026). Se sigue en toda pantalla nueva.
 
 ### 5.1 Principios
 1. **Mostrar solo lo que aplica.** Lo que no se usa en un estado se OCULTA (`pack_forget`, `grid_remove`), no se deja
@@ -460,16 +416,11 @@ Esta sección resume lo acordado en el rediseño de Mercado y Operar (noviembre 
    (resumen de la orden, calculadora). Los datos sueltos son filas «etiqueta … valor».
 5. **Jerarquía por tamaño, no por gris.** Títulos y cifras importantes con `Fonts` (`HEADING`, `VALUE`); rótulos pequeños en
    mayúsculas con `Fonts.SMALL`; todo en el color normal del tema.
-6. **Información que se lee de un vistazo en una franja** (saldo y patrimonio arriba en Operar; seis cifras en Portafolio),
-   no repartida en tarjetas.
+6. **Información que se lee de un vistazo en una franja** (saldo y patrimonio arriba en Operar), no repartida en tarjetas.
 7. **Botones de ocultar/mostrar un panel**: un botón con flecha («◀» / «▶») pegado al encabezado del panel que oculta; al
    ocultarlo queda un riel angosto con la flecha contraria. Nunca texto vertical (Tk no rota texto), nunca en una esquina lejana.
 8. **Texto explicativo permanente, mínimo.** Si algo se explica en una leyenda fija que ocupa espacio (p. ej. «Hora local ·
    cada vela = 1 hora») y la información ya se deduce, se quita.
-9. **Gráficos de línea: la escala se ajusta a lo que se ve** (como en las plataformas de trading), no empieza en 0, y una línea
-   de referencia (capital inicial) se dibuja solo si cabe en esa escala. Cada panel con eje de tiempo lleva sus etiquetas.
-10. **Datos de naturaleza distinta, en tablas distintas** (Riesgo y Operaciones en Portafolio), cada una con su título, en vez de
-    una sola tabla larga mezclada.
 
 ### 5.2 Colores (regla estricta)
 - **El texto de los widgets usa el color normal del tema** (un `ttk.Label` sin `foreground` ni `bootstyle`): blanco en un
@@ -482,7 +433,7 @@ Esta sección resume lo acordado en el rediseño de Mercado y Operar (noviembre 
 - **Volver al color normal tras haber puesto un color:** `label.configure(style="TLabel")` (no `foreground`, que se queda fijo y
   rompe los cambios posteriores de `bootstyle`).
 - **Botones toggle** (`outline-toolbutton`): su texto sale azulado por defecto; `styles.texto_normal(boton)` (se llama justo
-  después de crear cada toggle) lo deja en el color normal del tema. Lo usan los intervalos del gráfico, las pestañas de la lista y los rangos de Portafolio.
+  después de crear cada toggle) lo deja en el color normal del tema. Lo usan los intervalos del gráfico y las pestañas de la lista.
 - **Resaltado azul de un `Combobox` de solo lectura al elegir:** `SelectField.al_cambiar` ya hace `selection_clear()`.
 
 ### 5.3 Estructuras de referencia
@@ -492,8 +443,6 @@ Esta sección resume lo acordado en el rediseño de Mercado y Operar (noviembre 
 - **Barra del gráfico:** intervalos (toggles) a la izquierda; a la derecha «120 velas ▾» y «Indicadores ▾» (menú de casillas).
 - **Operar:** franja arriba (Saldo disponible · Patrimonio), gráfico + tablas a la izquierda, ticket a la derecha (ver 4.3).
 - **Mercado:** título, lista con encabezado «Activos ◀» a la izquierda; gráfico a la derecha con la barra «Operar AAPL» debajo.
-- **Portafolio:** título, pestañas «Resumen» y «Operaciones cerradas (N)»; en Resumen, franja de seis cifras, rangos + curva con panel de
-  caída a la izquierda, y las tablas «Riesgo» y «Operaciones» a la derecha (ver 4.3).
 - **Resumen de la orden:** etiqueta a la izquierda, valor a la derecha, un separador antes del total; el total en `VALUE`.
 
 ### 5.4 Qué NO se puede hacer en ttkbootstrap/tkinter (decirlo antes de proponerlo)
@@ -503,7 +452,7 @@ Esta sección resume lo acordado en el rediseño de Mercado y Operar (noviembre 
   reemplazar la tabla por una lista armada a mano (descartado por ahora).
 - **Texto rotado (vertical):** no.
 - **Íconos:** dependen de la fuente de Windows; se usan solo los símbolos ya probados («◀», «▶», «▾», «▸»), nunca íconos nuevos.
-- **`ttk.Notebook` para las secciones de la app:** no (mantendría todas vivas con sus refrescos); las secciones las maneja el Navegador. (Dentro de una sección sí: Operar y Portafolio lo usan.)
+- **`ttk.Notebook` para las secciones de la app:** no (mantendría todas vivas con sus refrescos); las secciones las maneja el Navegador.
 - **Cambiar fuente o colores del tema:** no sin que él lo pida (Helvetica, `darkly`).
 - **Un `ttk.Button` más angosto que su relleno interno:** no baja de cierto ancho; para algo muy delgado usar un `tk.Label` con clic.
 
@@ -522,8 +471,7 @@ acumulativo. Cada propuesta debe decir qué es viable y qué no (5.4) y qué arc
 `PascalCase`; constantes en `MAYUSCULAS`; privados con `_`; callbacks con prefijo `al_`. Un nombre debe decir
 lo que hace: `autenticar` verifica y no inicia sesión; el controlador es quien la inicia.
 **Base de datos:** clave primaria `id_<entidad>` y las foráneas con el mismo nombre (`usuarios.id_usuario`,
-`cuentas_simuladas.id_usuario`, `activos.id_fuente`). Las tablas cuya clave es compuesta (`precios_velas`, `snapshots_portafolio`)
-no llevan una `id_` propia.
+`cuentas_simuladas.id_usuario`, `activos.id_fuente`).
 
 **Código.**
 - Dinero con `Decimal`, nunca `float`. SQL siempre con parámetros. Filas leídas por nombre, nunca por posición.
@@ -566,7 +514,7 @@ no llevan una `id_` propia.
 9. **Errores de campo bajo su campo,** ocultos sin ocupar espacio, a todo el ancho y que desaparecen al escribir.
 10. **`psycopg2` y `BIGSERIAL`/`JSON`** por PostgreSQL 9.3; contraseñas con argon2.
 11. **El registro público solo crea usuarios normales** y crea su cuenta simulada (capital inicial 10 000 USD) **en la misma transacción**. El administrador (creado por script) no tiene cuenta simulada.
-12. **`worker.py` separado** (sin ventanas, mismos servicios y repositorios vía `composition.crear_servicios`, misma BD). Hoy mantiene precios y velas, guarda la foto del patrimonio y ejecuta órdenes pendientes y stop-loss/take-profit; luego evaluará predicciones. Usa un bucle simple, no APScheduler.
+12. **`worker.py` separado** (sin ventanas, mismos servicios y repositorios vía `composition.crear_servicios`, misma BD). Hoy mantiene precios y velas y ejecuta órdenes pendientes y stop-loss/take-profit; luego evaluará predicciones. Usa un bucle simple, no APScheduler.
 13. **Pocos activos y varias categorías:** 5 por categoría (cripto, acción, ETF, divisa, índice y bono) = 30. Cripto desde Binance; el resto desde Yahoo Finance. Los bonos se representan con ETF de bonos (un rendimiento no es un precio operable). Los pares en USDT se tratan como USD. El administrador puede sumar más.
 14. **Credenciales de BD en el cliente:** aceptado para un proyecto académico.
 15. **Panel de una sola ventana (shell):** tras el login, `home` muestra menú lateral fijo y las secciones se intercambian en el área de contenido; el login usa el mismo Navegador (a ventana completa). Los controladores reciben el `Navegador`, no la `App`.
@@ -612,22 +560,17 @@ no llevan una `id_` propia.
 56. **IA, fase 4 (admin).** Sección «Modelos de IA» (solo admin): estado del ciclo (última predicción, de hoy, pendientes, evaluadas), «Entrenar y evaluar» (confirma; corre en hilo; avisa si el modelo quedó activo o no), tabla de versiones, «Activar esta versión» (solo archivadas que superan la base) y «Comparar algoritmos» (LightGBM vs Random forest con el mismo walk-forward y los mismos datos, más la base; no guarda nada). Servicios: `ModeloIAService.comparar`, `PrediccionService.estado_ciclo`. Si el admin sale de la pantalla mientras entrena, el entrenamiento termina y se guarda igual.
 57. **IA: un solo horizonte, a 1 día.** Se quitaron los horizontes de 3, 5 y 10 días: los modelos no superaron a la base (z entre −0,5 y 0,6 en todas las versiones) y para probar predicciones eran demasiado largos. `HORIZONTES = (HORIZONTE,) = (1,)`; no hay selector de horizonte en «Predicciones IA» ni en «Modelos de IA». Los servicios (`entrenar`, `comparar`, `resumen`, `detalle`) siguen recibiendo `horizonte` y validan contra `HORIZONTES`, y las columnas `horizonte_dias` de la base no cambian: así, más adelante, se puede agregar otro plazo (por ejemplo por hora) sin rehacer el motor. La pestaña «Proyección» mantiene su ventana de 5 días (`_DIAS_PROYECCION`): es la dispersión de precio de Monte Carlo, no una predicción. Los indicadores `ret_3d`, `ret_5d` y `ret_10d` son retornos pasados y siguen siendo features. Quedó `database/ia_quitar_horizontes.sql` para borrar de la base lo que dejaron los horizontes anteriores.
 52. **El menú lateral del shell se queda como está.** Se evaluó una barra de íconos y pestañas arriba (no caben los módulos futuros ni el menú de admin con textos largos); se descartó. Si más adelante se quiere ahorrar ancho, la opción acordada como válida es una barra lateral **ocultable** (mismo patrón ◀/▶ de 5.1).
-53. **Portafolio es para quien opera:** el administrador no lo ve (no tiene cuenta simulada); `PortafolioService` usa `exigir_operador`. Las posiciones abiertas y las órdenes siguen en Operar; Portafolio solo mide cómo va la cuenta. Las operaciones cerradas se ven en Portafolio (con ganancia) y el historial de órdenes en Operar: son datos distintos, no se repiten.
-54. **La curva de capital se guarda como fotos, una por MINUTO** (`snapshots_portafolio`, clave `id_cuenta` + `momento`), sin `rentabilidad_pct` ni `drawdown_pct` (se calculan al leer, para no repetir datos). Las guarda el worker cada 60 s y también la pantalla al abrirse y refrescarse (mismo minuto = misma fila): así la curva avanza aunque el worker esté apagado. Una foto por hora se descartó (la curva tardaba demasiado en tener forma). **No se reconstruye el pasado** desde `ejecuciones` y velas (complejo y poco fiable): la curva solo existe desde la primera foto. Lo de más de 7 días se compacta a una foto por hora (`SnapshotRepository.compactar`, una vez por hora, función de ventana).
-55. **Las métricas de riesgo viven en `analisis/metricas.py`** (caída, retornos diarios, volatilidad, Sharpe) y las de operaciones en `domain/reglas/portafolio.py`, para que Backtesting las reutilice. Volatilidad y Sharpe salen «—» con menos de 20 días de historial (365 días al año, sin tasa libre de riesgo). **Se descartaron** Sortino, «relación ganancia/pérdida» (repite el factor de beneficio) y los márgenes (no hay margen). Se añadió Exposición.
-56. **Escala del gráfico de línea: se ajusta a lo visible, no empieza en 0** (como las plataformas de trading); la línea del capital inicial solo se dibuja si cabe en la escala. El eje de tiempo lleva sus etiquetas bajo cada panel. **Modo «%»** (eje con el cambio desde el inicio del rango): descartado por ahora; tendría sentido para comparar contra comprar y mantener en Backtesting.
-57. **Portafolio en pantalla:** rango inicial «1 día»; las métricas van en DOS tablas (**«Riesgo»** y **«Operaciones»**, esta con las comisiones) en vez de una sola mezclada; sin textos de ayuda bajo las tablas (los términos se explicarán con el glosario con tooltips, más adelante). Solo se conserva la nota de que volatilidad y Sharpe necesitan 20 días, porque explica los «—».
-58. **IA: de dirección a VOLATILIDAD (noviembre de 2026).** La dirección (AUC ≈ 0,61, acierto ≈ base, z < 1,65 en todas las pruebas) se apartó a `experimental/direccion/` (código y pruebas intactos, sin ejecutarse; sus tablas `predicciones_direccion` y `explicaciones_prediccion` siguen en la base sin tocar). La app real predice el **rango del próximo día**: `(máximo − mínimo) / cierre` de la vela diaria, como fracción (0,023 = 2,3 %), solo diario y los 30 activos. Objetivo en logaritmo: `ln(rango_{i+1}) − ln(media de los últimos 20 rangos hasta i)` («cuántas veces lo normal»); la predicción es `exp(ŷ + ln media20)`. 22 features en Python puro (`analisis/volatilidad.py`, `ARRANQUE = 120`), sin mirar el futuro. LightGBM regresor (`ia/volatilidad.py`; en pruebas se inyecta `HistGradientBoostingRegressor`). Validación walk-forward de 4 tramos con purga contra DOS bases: «repetir el rango de hoy» y «promedio de 20 días»; z pareado por día (promedio de los activos de cada día) corregido por autocorrelación AR(1); el modelo es ACTIVO solo si el **menor** de los dos z ≥ 1,65, si no queda ARCHIVADO. Salida por activo: rango en %, intervalo de ~80 % (con el sigma del error de validación), **nivel** baja/normal/alta (≤ percentil 25 / ≥ 75 de los últimos 90 rangos del mismo activo; los umbrales se guardan con la predicción y con ellos se evalúa) y los factores (`pred_contrib`). Reutiliza `modelos_ia` (`tipo='volatilidad'`, nombre `volatilidad_1d`, `horizonte_dias = 1`) y `entrenamientos_modelo`, más UNA tabla nueva `predicciones_volatilidad` (`database/ia_volatilidad.sql`; los factores van en una columna JSON). Evaluación en vivo: cuando existe la vela objetivo se guarda `rango_real`, `nivel_real` y `acierto_nivel`; el registro compara el error real del modelo con el de «repetir hoy». Código: `domain/reglas/volatilidad.py`, `ia/volatilidad.py`, `services/modelo_volatilidad_service.py` (`entrenar(actor)`, `comparar(actor)`, `listar`, `activar`), `services/prediccion_volatilidad_service.py` (`generar_predicciones`, `evaluar_vencidas`, `resumen`, `detalle`, `estado_ciclo`, `proyectar`), `repositories/prediccion_volatilidad_repository.py`; `ModeloIARepository.listar/listar_activos` reciben `tipo`. En `Servicios`: `volatilidad` y `modelo_volatilidad`. El modelo de dirección que haya en `modelos_ia` no lo toca nada (otro `tipo`). Las rutas `ia` y `admin_modelos_ia` se conservan con pantallas nuevas. **Sin verificar con datos reales:** si el modelo supera a las dos bases en los 30 activos, la forma de `pred_contrib` de LightGBM regresor (se probó con un booster simulado), el SQL en PostgreSQL 9.3 y toda la interfaz.
+58. **IA: de dirección a VOLATILIDAD (noviembre de 2026).** La dirección (AUC ≈ 0,61, acierto ≈ base, z < 1,65 en todas las pruebas) se apartó a `experimental/direccion/` (código y pruebas intactos, sin ejecutarse; sus tablas `predicciones_direccion` y `explicaciones_prediccion` siguen en la base sin tocar). La app real predice el **rango del próximo día**: `(máximo − mínimo) / cierre` de la vela diaria, como fracción (0,023 = 2,3 %), solo diario y los 30 activos. Objetivo en logaritmo: `ln(rango_{i+1}) − ln(media de los últimos 20 rangos hasta i)` («cuántas veces lo normal»); la predicción es `exp(ŷ + ln media20)`. 22 features en Python puro (`analisis/volatilidad.py`, `ARRANQUE = 120`), sin mirar el futuro. LightGBM regresor (`ia/volatilidad.py`; en pruebas se inyecta `HistGradientBoostingRegressor`). Validación walk-forward de 4 tramos con purga contra DOS bases: «repetir el rango de hoy» y «promedio de 20 días»; z pareado por día (promedio de los activos de cada día) corregido por autocorrelación AR(1); el modelo es ACTIVO solo si el **menor** de los dos z ≥ 1,65, si no queda ARCHIVADO. Salida por activo: rango en %, intervalo de ~80 % (con el sigma del error de validación), **nivel** baja/normal/alta (≤ percentil 25 / ≥ 75 de los últimos 90 rangos del mismo activo; los umbrales se guardan con la predicción y con ellos se evalúa) y los factores (`pred_contrib`). Reutiliza `modelos_ia` (`tipo='volatilidad'`, nombre `volatilidad_1d`, `horizonte_dias = 1`) y `entrenamientos_modelo`, más UNA tabla nueva `predicciones_volatilidad` (`database/ia_volatilidad.sql`; los factores van en una columna JSON). Evaluación en vivo: cuando existe la vela objetivo se guarda `rango_real`, `nivel_real` y `acierto_nivel`; el registro compara el error real del modelo con el de «repetir hoy». Código: `domain/reglas/volatilidad.py`, `ia/volatilidad.py`, `services/modelo_volatilidad_service.py` (`entrenar(actor)`, `comparar(actor)`, `listar`, `activar`), `services/prediccion_volatilidad_service.py` (`generar_predicciones`, `evaluar_vencidas`, `resumen`, `detalle`, `estado_ciclo`, `proyectar`), `repositories/prediccion_volatilidad_repository.py`; `ModeloIARepository.listar/listar_activos` reciben `tipo`. En `Servicios`: `volatilidad` y `modelo_volatilidad`. El modelo de dirección que haya en `modelos_ia` no lo toca nada (otro `tipo`). Las rutas `ia` y `admin_modelos_ia` se conservan con pantallas nuevas. **Verificado por el usuario con datos reales (22/11/2026):** modelo v1 «Aprobado», error ±38 % contra ±52 % (hoy) y ±44 % (promedio), mejor que ambas bases en 30 de 30 activos, nivel acertado 52 % contra 45 % (hoy) y 50 % (siempre «normal»); el SQL y la interfaz funcionan.
 
 ---
 
 ## 8. Base de datos (PostgreSQL 9.3)
 
 **`database/schema.sql` es una GUÍA de lo que la base podría llegar a tener, no la fuente de verdad.** La base real
-tiene hoy estas tablas y se irá ajustando por módulo (hay un volcado en `database/simultradia_esquema.sql`, anterior a Portafolio):
+tiene hoy estas tablas y se irá ajustando por módulo (hay un volcado en `database/simultradia_esquema.sql`):
 
 - `usuarios` (recortada: sin `avatar_url`, pero con `debe_cambiar_password`) y `cuentas_simuladas` (con `comision_pct`,
-  `deslizamiento_pct`, `es_replay`, `activa`, `reiniciada_en`; Operar y Portafolio usan las cuentas con `activa` y `NOT es_replay`;
+  `deslizamiento_pct`, `es_replay`, `activa`, `reiniciada_en`; Operar usa las cuentas con `activa` y `NOT es_replay`;
   `es_replay` y `reiniciada_en` esperan a Replay y al reinicio de cuenta).
 - **Las de Mercado, definidas de verdad en `database/mercado.sql`:** `fuentes_datos` (`id_fuente`, `nombre`, `activa`),
   `activos` (`id_activo`, `ticker`, `nombre`, `tipo`, `moneda`, `activo`, `id_fuente`, `creado_en`),
@@ -635,7 +578,7 @@ tiene hoy estas tablas y se irá ajustando por módulo (hay un volcado en `datab
   (`id_activo`, `precio`, `cierre_anterior`, `variacion_pct_dia`, `maximo_dia`, `minimo_dia`, `volumen_dia`,
   `actualizado_en`). Más los tipos `tipo_activo` e `intervalo_vela`. Son más chicas que las de la guía a propósito
   (sin sector, logo, capitalización, etc.).
-- **Las de IA:** `database/ia.sql` (`modelos_ia`, `entrenamientos_modelo`, y las de dirección, hoy sin uso) y `database/ia_volatilidad.sql` (tipo `nivel_volatilidad` y tabla `predicciones_volatilidad`: `id_activo`, `id_modelo`, `generada_en`, `fecha_objetivo`, `precio_referencia`, `rango_predicho`, `rango_bajo`, `rango_alto`, `rango_hoy`, `rango_normal`, `umbral_bajo`, `umbral_alto`, `nivel`, `factores` JSON, y al evaluar `rango_real`, `nivel_real`, `acierto_nivel`, `evaluada_en`; una predicción por día UTC por activo y modelo). Orden: `ia.sql`, luego `ia_volatilidad.sql`.
+- **Las de IA:** `database/ia.sql` (`modelos_ia`, `entrenamientos_modelo`, y las de dirección, hoy sin uso) y `database/ia_volatilidad.sql` (tipo `nivel_volatilidad` y tabla `predicciones_volatilidad`: `id_activo`, `id_modelo`, `generada_en`, `fecha_objetivo`, `precio_referencia`, `rango_predicho`, `rango_bajo`, `rango_alto`, `rango_hoy`, `rango_normal`, `umbral_bajo`, `umbral_alto`, `nivel`, `factores` JSON, y al evaluar `rango_real`, `nivel_real`, `acierto_nivel`, `evaluada_en`; una predicción por día UTC por activo y modelo). Orden mientras sean archivos sueltos: `ia.sql`, luego `ia_volatilidad.sql`; el usuario los integra en un único `simultradia_esquema.sql` (la tabla `predicciones_volatilidad` de `ia_volatilidad.sql` reemplaza a la del esquema de guía, que tenía otras columnas).
 - **Las de Operar, definidas de verdad en `database/operar.sql` y `operar_fase2.sql`**, más chicas que las de la guía:
   - `ordenes`: `id_orden`, `id_cuenta`, `id_activo`, `lado`, `tipo`, `estado`, `cantidad`, `precio_promedio`,
     `comision_total`, `creada_en`, `ejecutada_en` y (fase 2) `precio_limite`, `stop_loss`, `take_profit` (niveles que
@@ -649,25 +592,22 @@ tiene hoy estas tablas y se irá ajustando por módulo (hay un volcado en `datab
   - Tipos `lado_orden`, `tipo_orden` (mercado, limite, stop_loss, take_profit, stop_limite) y `estado_orden`, con TODOS
     sus valores desde el principio (en 9.3 agregar un valor a un ENUM no se puede hacer dentro de una transacción).
     `stop_limite` no se usa. Las columnas que falten se agregan con `ALTER TABLE ... ADD COLUMN`.
-- **La de Portafolio, definida de verdad en `database/portafolio.sql`** (se ejecuta una vez sobre la base real):
-  `snapshots_portafolio` con `id_cuenta` (FK con `ON DELETE CASCADE`), `momento` (inicio del minuto, UTC), `saldo_disponible`,
-  `valor_posiciones` y `patrimonio_total`; clave primaria `(id_cuenta, momento)`. Sin `rentabilidad_pct` ni `drawdown_pct` ni
-  `fecha` (a diferencia de la guía). Una fila por minuto; lo de más de 7 días se compacta a una por hora (decisión 54).
 
 Lo demás es el diseño orientativo: tablas, columnas y nombres pueden cambiar o no existir. Lo que sí es regla:
 PostgreSQL 9.3, claves `id_<entidad>` y los tipos de abajo.
 
-- **Versión 9.3:** `BIGSERIAL`, `JSON`, `COUNT(CASE WHEN ...)`, `EXECUTE PROCEDURE` en triggers, sin `ON CONFLICT` ni `CREATE INDEX IF NOT EXISTS`, sin TimescaleDB. `FOR UPDATE OF <alias>` sí existe; las funciones de ventana (`row_number() OVER`) también.
+- **Versión 9.3:** `BIGSERIAL`, `JSON`, `COUNT(CASE WHEN ...)`, `EXECUTE PROCEDURE` en triggers, sin `ON CONFLICT` ni `CREATE INDEX IF NOT EXISTS`, sin TimescaleDB. `FOR UPDATE OF <alias>` sí existe.
 - **Claves:** PK `id_<entidad>` (`usuarios.id_usuario`, `activos.id_activo`, `cuentas_simuladas.id_cuenta`, `ordenes.id_orden`...); las foráneas llevan el mismo nombre. Índice único `lower(email)`: el email se guarda en minúsculas.
 - **Tipos:** dinero `NUMERIC(20,4)`, precios `NUMERIC(20,8)`, cantidades `NUMERIC(28,10)`, porcentajes como número legible (5.25 = 5,25 %), **probabilidades de la IA de 0 a 1**, fechas `TIMESTAMPTZ` en UTC.
 - **Ideas clave del modelo (orientativas, aún sin crear):**
+  - `snapshots_portafolio` es la foto diaria del patrimonio.
   - `sesiones_replay` usa una cuenta propia con `es_replay = TRUE`.
   - `predicciones_direccion` guarda lo predicho y lo ocurrido (`acierto`); `vista_precision_modelos` calcula el historial.
   - `estrategias.definicion` (JSON) guarda las reglas del backtesting.
   - `registros_ingesta` (errores por activo y ejecución) y `auditoria_admin` quedan para cuando se amplíe la administración.
 - **Fuera del esquema (descartadas):** configuraciones de gráfico, datos fundamentales, calendario de eventos, chat asistente, tutoriales y retos, y posiciones cortas. No hay enums ni columnas para ellas.
 - **Compra/venta vs. larga/corta:** `ordenes.lado` (`compra`/`venta`) sí existe; `posiciones` no tiene `lado` porque solo hay posiciones largas (vender cierra o reduce la posición).
-- **Vistas y función (guía):** `vista_posiciones_valoradas`, `vista_resumen_cuenta`, `vista_estadisticas_operaciones`, `vista_precision_modelos`, `reiniciar_cuenta(id_cuenta)`. (Operar y Portafolio valoran las posiciones en Python, no con la vista. Si se implementa el reinicio de cuenta, debe borrar también sus filas de `snapshots_portafolio`.)
+- **Vistas y función (guía):** `vista_posiciones_valoradas`, `vista_resumen_cuenta`, `vista_estadisticas_operaciones`, `vista_precision_modelos`, `reiniciar_cuenta(id_cuenta)`. (Operar valora las posiciones en Python, no con la vista.)
 
 ---
 
@@ -675,14 +615,13 @@ PostgreSQL 9.3, claves `id_<entidad>` y los tipos de abajo.
 
 - Desde la raíz: `python -m unittest discover -s tests -t . -v` (con `pip install -e .` hecho). No necesitan PostgreSQL, ventanas ni internet.
 - Estructura: `tests/fakes.py` (falsos compartidos) y subcarpetas `core/`, `services/`, `iu/`, `analisis/`, `clients/`, `domain/`, cada una con `__init__.py`; se importa `from tests.fakes import ...`.
-- **Servicios:** `DatabaseFalsa`, `RepositorioFalso`, `CuentaRepositorioFalso`, `RepoActivoFalso`, `RepoPrecioFalso`, `RepoFuenteFalso`, `UsuarioRepoAdminFalso`, `ClienteMercadoFalso` (hace de una fuente y declara sus tipos, formato de ticker y ritmo). `tests/services/test_portafolio_service.py` define sus propios falsos de cuenta, posición y snapshot (incluida la compactación).
-- **Controladores:** `VistaFalsa` (formularios), `VistaPanelFalsa` (secciones; anota lo que le ordenan —incluidos `mostrar_patrimonio` y `limpiar_cantidad`—, y cada diálogo de error que se habría abierto en `errores_mostrados`), `NavegadorFalso`, `ServicioFalso`, `ServicioGenerico` (responde cualquier método con lo que se le prepare) y una `Session()` propia por prueba. `ejecutar_en_hilo` se reemplaza con `mock.patch(...)` en `simultradia.iu.base.form_controller` o `simultradia.iu.base.panel_controller` (en el acto, o diferido con `EjecutorDiferido`). `tests/iu/test_panel_controller.py` prueba el aviso único de los refrescos periódicos. `tests/iu/test_operar_lado.py` prueba el patrimonio y la cantidad al cambiar de lado; `tests/iu/test_lista_nombre.py`, el orden por Nombre; `tests/iu/test_portafolio_controller.py`, el refresco de Portafolio (una consulta a la vez, aviso único del fallo).
+- **Servicios:** `DatabaseFalsa`, `RepositorioFalso`, `CuentaRepositorioFalso`, `RepoActivoFalso`, `RepoPrecioFalso`, `RepoFuenteFalso`, `UsuarioRepoAdminFalso`, `ClienteMercadoFalso` (hace de una fuente y declara sus tipos, formato de ticker y ritmo).
+- **Controladores:** `VistaFalsa` (formularios), `VistaPanelFalsa` (secciones; anota lo que le ordenan —incluidos `mostrar_patrimonio` y `limpiar_cantidad`—, y cada diálogo de error que se habría abierto en `errores_mostrados`), `NavegadorFalso`, `ServicioFalso`, `ServicioGenerico` (responde cualquier método con lo que se le prepare) y una `Session()` propia por prueba. `ejecutar_en_hilo` se reemplaza con `mock.patch(...)` en `simultradia.iu.base.form_controller` o `simultradia.iu.base.panel_controller` (en el acto, o diferido con `EjecutorDiferido`). `tests/iu/test_panel_controller.py` prueba el aviso único de los refrescos periódicos. `tests/iu/test_operar_lado.py` prueba el patrimonio y la cantidad al cambiar de lado; `tests/iu/test_lista_nombre.py`, el orden por Nombre.
 - **Navegador:** `VentanaFalsa`, `PantallaFalsa`, `ShellFalso`.
-- **Dominio, análisis, formato y gráfico:** puro Python; las reglas de operar en `tests/domain/`(y las de portafolio, en `tests/domain/test_portafolio.py`); las métricas de la curva en `tests/analisis/test_metricas.py`; el dibujo (`candle_render`) se prueba con una `Figure` de matplotlib y `savefig`; las marcas del eje horizontal (`indices_eje_x`, `etiquetas_eje_x`) en `tests/iu/test_candle_etiquetas.py`y las de la curva (`marcas_eje_x`, `etiquetas_eje_x`) en `tests/iu/test_equity_render.py`. Las pruebas del cliente de Yahoo usan tablas de pandas armadas a mano (se saltan si pandas no está).
+- **Dominio, análisis, formato y gráfico:** puro Python; las reglas de operar en `tests/domain/`; el dibujo (`candle_render`) se prueba con una `Figure` de matplotlib y `savefig`; las marcas del eje horizontal (`indices_eje_x`, `etiquetas_eje_x`) en `tests/iu/test_candle_etiquetas.py`. Las pruebas del cliente de Yahoo usan tablas de pandas armadas a mano (se saltan si pandas no está).
 - **IA:** `tests/ia/vol_fakes.py` (series sintéticas con volatilidad anticipable o al azar, repositorios en memoria, regresor de scikit-learn), `tests/ia/test_volatilidad.py`, `tests/analisis/test_volatilidad.py`, `tests/domain/test_reglas_volatilidad.py`, `tests/services/test_volatilidad_services.py`, `tests/iu/test_ia_controller.py`, `tests/iu/test_modelos_volatilidad_controller.py`, `tests/iu/test_ia_textos.py`, `tests/iu/test_ia_graficos.py`. Las pruebas de la dirección viven en `tests/experimental/` y deben seguir pasando.
-
 - **Las vistas de tkinter NO se prueban** (nadie las ejecuta fuera de la app): un error de armado solo aparece al abrir la pantalla.
-- **Entorno de Claude:** sin tkinter, ttkbootstrap, psycopg2, ccxt, yfinance ni red. Se verifica con módulos simulados (stubs) en una carpeta temporal y `PYTHONPATH`. Lo visual y las conexiones reales solo los puede comprobar el usuario; el dibujo de un gráfico se puede guardar como imagen y mirar.
+- **Entorno de Claude:** sin tkinter, ttkbootstrap, psycopg2, ccxt, yfinance ni red. Se verifica con módulos simulados (stubs) en una carpeta temporal y `PYTHONPATH`. Lo visual y las conexiones reales solo los puede comprobar el usuario.
 
 ---
 
@@ -706,9 +645,7 @@ widgets con `foreground=Palette.TEXTO` o `bootstyle=Colors.MUTED`** · **campos 
 ocultos** · **una versión "compacta" de un componente en lugar de dejar que el contenedor decida el tamaño** · **botones
 de una pantalla metidos dentro de un componente genérico** · **texto vertical o leyendas fijas que gastan espacio** ·
 **proponer diseños que ttkbootstrap no puede dibujar** (5.4) · **escribir código de un rediseño antes de que el usuario
-apruebe el mockup** · **un gráfico de línea con la escala forzada a incluir 0 o a incluir una línea de referencia lejana (aplasta
-la curva)** · **guardar en la base un dato que se puede calcular al leer (rentabilidad, drawdown)** · **una tabla que crece
-sin límite sin una compactación** · **mezclar en una misma tabla métricas de naturaleza distinta (riesgo y operaciones)**.
+apruebe el mockup**.
 
 ---
 
@@ -730,18 +667,6 @@ sin límite sin una compactación** · **mezclar en una misma tabla métricas de
   rechazo, y el job del worker que ejecuta lo pendiente.
 - **Rediseño visual (noviembre de 2026):** colores de texto normales del tema, componente de gráfico unificado, eje X con
   hora/fecha, ticket sin campos deshabilitados, Mercado con botón de operar y lista ocultable.
-- **Portafolio (primera versión, noviembre de 2026):** franja de seis cifras, curva de capital con caída desde el máximo (rango
-  inicial 1 día, escala ajustada, eje de tiempo con etiquetas), tablas «Riesgo» y «Operaciones» y pestaña de operaciones cerradas.
-  Fotos del patrimonio una por minuto (worker + al abrir la pantalla) con compactación a una por hora tras 7 días. Pendiente de
-  validar en pantalla por el usuario (ver «Deuda técnica»).
-
-**Pendiente de Portafolio (mejoras, sin decidir o sin aplicar)**
-- **Foto en cada operación ejecutada** (desde `OperarService`): hoy, con el worker apagado, una operación solo aparece como un
-  salto cuando se abre Portafolio. Toca el servicio más delicado; se hace solo si el usuario lo pide.
-- **Reconstruir el historial** desde `ejecuciones` y velas guardadas (descartado por complejo; revisable si hace falta).
-- **Modo «%»** del gráfico (cambio desde el inicio del rango), pestaña «Por activo» y ordenar por columna las operaciones cerradas.
-- Glosario con tooltips para los términos (caída máxima, Sharpe, factor de beneficio...).
-- Si hay reinicio de cuenta, borrar también sus fotos. Si la tabla creciera aun así, revisar la compactación.
 
 **Pendiente del rediseño visual (propuestas hechas, sin decidir o sin aplicar)**
 - **Cantidad con 10 decimales** (`19,5451961105` al usar Máx. o %): redondear solo al calcular con Máx./% no es seguro con activos baratos; hay que decidir cuántos decimales según el precio.
@@ -763,7 +688,7 @@ sin límite sin una compactación** · **mezclar en una misma tabla métricas de
 
 **Pendiente de administración (próxima mejora)**
 - Usuarios: **cambiar el rol** (decidido a medias: ver más abajo), reiniciar la cuenta (ahora que existen las tablas de operar,
-  ya se puede: borrar órdenes, posiciones, operaciones cerradas y fotos del patrimonio de esa cuenta y devolver el saldo; usa `reiniciada_en`) y
+  ya se puede: borrar órdenes, posiciones y operaciones cerradas de esa cuenta y devolver el saldo; usa `reiniciada_en`) y
   ver el detalle de un usuario (su cuenta simulada, solo lectura).
 - Activos: estado de los datos por activo ("al día", "desactualizado", "sin datos") y botón para recargar las velas de uno solo.
 - Fuentes e ingesta: historial de errores guardado en una tabla (`registros_ingesta`), **ritmo editable por fuente**
@@ -782,14 +707,19 @@ sin límite sin una compactación** · **mezclar en una misma tabla métricas de
 - Sin verificar: el SQL de `ia.sql` y de los repositorios (sin PostgreSQL), en particular el índice único por día `((generada_en AT TIME ZONE 'UTC')::date)`; `explicar` usa `booster_.predict(pred_contrib=True)` (diseño de columnas por clase no probado con LightGBM real).
 
 **Pendiente del usuario (orden propuesto)**
-Watchlist → noticias → IA → Backtesting → Replay → Coach → Glosario → **Inicio** (al final). Cada pantalla nueva sigue la
-sección 5 (mockup primero). (Portafolio ya tiene su primera versión; ver arriba.)
+**Portafolio** (patrimonio, rentabilidad vs capital inicial, drawdown, % de aciertos, evolución del capital con
+`snapshots_portafolio`, ganancia por operación cerrada con `operaciones_cerradas`; las posiciones abiertas y su P&L ya viven
+en Operar, así que Portafolio es el análisis) → Watchlist → noticias → IA → Backtesting → Replay → Coach → Glosario →
+**Inicio** (al final). Cada pantalla nueva sigue la sección 5 (mockup primero).
 Más adelante: **moneda de la aplicación** (configuración + cambio de moneda con tasa de cambio).
 
 **Deuda técnica conocida**
 - Renombrar `UsuarioService` a `AuthService` y usar `validacion.py` en lugar de su copia de `_lanzar_si_hay_errores` (aplazado al final del proyecto).
 - `yfinance` no se ha probado contra internet real; Yahoo cambia y bloquea con cierta frecuencia. Si falla, el worker lo registra y sigue con Binance.
 - Binance puede estar bloqueado en algunos países; si no hay datos, revisar el log del worker.
-- Lo visual de la interfaz nunca lo ha visto Claude: lo valida el usuario ejecutando la app (la tarjeta de los formularios, las ventanas emergentes, el ticket con scroll, el reparto del alto, el riel de la lista de Mercado, los toggles y, en Portafolio, la franja, las pestañas y las dos tablas apiladas). Si algo se ve mal, el usuario pasa una captura.
-- `SnapshotRepository.compactar` (SQL con función de ventana) no se ha probado contra PostgreSQL real.
+- Lo visual de la interfaz nunca lo ha visto Claude: lo valida el usuario ejecutando la app (la tarjeta de los formularios, las ventanas emergentes, el ticket con scroll, el reparto del alto, el riel de la lista de Mercado y los toggles). Si algo se ve mal, el usuario pasa una captura.
 - Los activos en otra moneda (USDJPY=X, USDCAD=X, ^GDAXI, ^N225) no se pueden operar hasta que haya conversión.
+
+59. **Volatilidad: días en UTC (22/11/2026).** PostgreSQL devuelve las velas en la zona de la sesión (p. ej. −03): la vela diaria del viernes llega como «jue 21:00 −03», así que `weekday()` o `date()` locales daban el día equivocado y `fecha_objetivo` caía en sábado. Ahora `domain/reglas/volatilidad.py` tiene `a_utc`, `dia_utc` y `dia_de_la_vela_objetivo`; `fecha_objetivo`, las features `dia_sin/dia_cos` y `armar_dataset` usan el día UTC. `fecha_objetivo` devuelve UTC. La pantalla muestra «se comprueba con la vela del lun 23/11» (`textos.dia_de_vela`). El worker no genera predicciones cuya `fecha_objetivo` ya pasó. Los instantes (`generada_en`, fecha de entrenamiento) siguen en hora local. Tras aplicar: `delete from predicciones_volatilidad where rango_real is null;` y reentrenar (las features cambian).
+60. **Rediseño visual de «Predicciones IA».** Escáner con botones Todos/Alta/Normal/Baja (con conteo), ordenado por ticker (A–Z), solo ticker, «vs. normal» solo como número; el color del nivel va en el texto de la fila (`alerta` naranja, `calma` celeste en `DataTable`; ttkbootstrap no permite «globitos»). Volatilidad: tres tarjetas (nivel, rango, frente a lo normal), gráfico de los últimos 30 días y mañana con fechas cada dos barras (`dibujar_ultimos_dias`, `DetalleActivoVolatilidad.rangos_recientes/fechas_recientes`), tarjetas hoy/normal/umbrales, factores y «Cómo se puede usar». Evaluación en seis secciones (incluye `dibujar_calibracion`). Registro con `dibujar_historial` (banda del 80 %). Paleta: `Palette.ALERTA`, `Palette.CALMA`, `Colors.INFO`. El nivel de volatilidad no usa verde ni rojo.
+- **Pendiente:** AUDUSD=X muestra «hoy se movió 0,0 %» (posible vela diaria parcial o sin rango que el modelo usa como entrada). Idea evaluada y aún no hecha: volatilidad por hora (solo 1 h, antes medir contra la base «promedio de esa hora»; necesita calendarios de sesión).
