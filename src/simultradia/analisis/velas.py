@@ -4,7 +4,7 @@ Sin BD ni interfaz. Todas las velas están en UTC.
 """
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from typing import List
+from typing import List, Optional, Sequence
 
 from simultradia.domain.entities.vela_entity import Vela
 from simultradia.domain.enums import IntervaloVela
@@ -65,3 +65,18 @@ def aplicar_precio(velas: List[Vela], precio: Decimal, momento: datetime,
         return velas
     return velas + [Vela(inicio_de_periodo(momento, intervalo), precio, precio, precio, precio,
                          Decimal("0"))]
+
+
+def velas_cerradas(velas: Sequence[Vela], ahora: Optional[datetime] = None,
+                   intervalo: IntervaloVela = IntervaloVela.D1) -> List[Vela]:
+    """Quita la vela que todavía está en curso: sus cierre, máximo y volumen aún cambian."""
+    ahora = ahora or datetime.now(timezone.utc)
+    if ahora.tzinfo is None:
+        ahora = ahora.replace(tzinfo=timezone.utc)
+    duracion = timedelta(seconds=SEGUNDOS[intervalo])
+    cerradas = []
+    for v in velas:
+        inicio = v.momento if v.momento.tzinfo else v.momento.replace(tzinfo=timezone.utc)
+        if inicio + duracion <= ahora:
+            cerradas.append(v)
+    return cerradas

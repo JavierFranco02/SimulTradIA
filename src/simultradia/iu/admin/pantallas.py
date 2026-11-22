@@ -3,6 +3,8 @@ from simultradia.iu.admin.activos_controller import ActivosAdminController
 from simultradia.iu.admin.activos_view import ActivosAdminView
 from simultradia.iu.admin.ingesta_controller import IngestaController
 from simultradia.iu.admin.ingesta_view import IngestaView
+from simultradia.iu.admin.modelos_ia_controller import ModelosIAController
+from simultradia.iu.admin.modelos_ia_view import ModelosIAView
 from simultradia.iu.admin.usuarios_controller import UsuariosController
 from simultradia.iu.admin.usuarios_view import UsuariosView
 
@@ -26,7 +28,14 @@ def _ingesta(padre, nav):
     return vista
 
 
+def _modelos_ia(padre, nav):
+    vista = ModelosIAView(padre)
+    ModelosIAController(vista, nav.servicios.modelo_volatilidad, nav.servicios.volatilidad, nav.session).cargar()
+    return vista
+
+
 def registrar(navegador) -> None:
     navegador.registrar("admin_usuarios", _usuarios, en_shell=True)
     navegador.registrar("admin_activos", _activos, en_shell=True)
     navegador.registrar("admin_ingesta", _ingesta, en_shell=True)
+    navegador.registrar("admin_modelos_ia", _modelos_ia, en_shell=True)

@@ -5,6 +5,7 @@ Para agregar un módulo nuevo: crea su carpeta en iu/ y suma una línea aquí.
 """
 from simultradia.iu.admin import pantallas as admin
 from simultradia.iu.auth import pantallas as auth
+from simultradia.iu.ia import pantallas as ia
 from simultradia.iu.inicio import pantallas as inicio
 from simultradia.iu.mercado import pantallas as mercado
 from simultradia.iu.operar import pantallas as operar
@@ -17,6 +18,7 @@ def registrar_pantallas(navegador) -> None:
     shell.registrar(navegador)
     inicio.registrar(navegador)
     mercado.registrar(navegador)
+    ia.registrar(navegador)
     operar.registrar(navegador)
     portafolio.registrar(navegador)
     admin.registrar(navegador)

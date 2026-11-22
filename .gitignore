@@ -7,3 +7,6 @@ venv/
 .vscode/
 *.egg-info/
 database/incremental
+modelos/
+src/simultradia/experimental
+tests/experimental

@@ -8,6 +8,7 @@ Se ejecuta en una terminal aparte, mientras la app está abierta:
     con esos precios, las órdenes límite que llegaron a su precio y los stop-loss / take-profit disparados
   - cada 60 segundos: velas nuevas (la primera vez descarga todo el historial; puede tardar) y la foto del
     patrimonio de cada cuenta (la curva de Portafolio; una fila por minuto)
+  - cada hora: evalúa las predicciones de volatilidad vencidas y genera la del día (si ya hay un modelo activo)
 
 Solo PROGRAMA cuándo corre cada tarea; el trabajo está en jobs/ y en los servicios.
 Se detiene con Ctrl+C.
@@ -23,9 +24,15 @@ from simultradia.core.exceptions import ErrorBaseDatos
 from simultradia.core.logging_config import configurar_logging
 from simultradia.core.settings import SETTINGS
 from simultradia.jobs import (
-    actualizar_cotizaciones_job, actualizar_velas_job, evaluar_ordenes_job, guardar_snapshots_job)
+    actualizar_cotizaciones_job, actualizar_velas_job, evaluar_ordenes_job, evaluar_volatilidad_job,
+    generar_volatilidad_job, guardar_snapshots_job)
 
 _log = logging.getLogger("worker")
+
+
+def _tareas_de_ia(servicios) -> None:
+    evaluar_volatilidad_job.ejecutar(servicios)
+    generar_volatilidad_job.ejecutar(servicios)
 
 
 def main() -> int:
@@ -40,6 +47,8 @@ def main() -> int:
     ultima_pasada_velas = float("-inf")
     ultima_foto = float("-inf")
     hilo_velas = None
+    ultima_pasada_ia = float("-inf")
+    hilo_ia = None
     _log.info("Worker iniciado. Ctrl+C para detenerlo.")
     try:
         while True:
@@ -56,6 +65,11 @@ def main() -> int:
                     target=actualizar_velas_job.ejecutar, args=(servicios,), daemon=True)
                 hilo_velas.start()
                 ultima_pasada_velas = inicio
+            # La IA también va aparte: leer 10 años de velas y predecir no debe frenar los precios.
+            if inicio - ultima_pasada_ia >= 3600 and not (hilo_ia and hilo_ia.is_alive()):
+                hilo_ia = threading.Thread(target=_tareas_de_ia, args=(servicios,), daemon=True)
+                hilo_ia.start()
+                ultima_pasada_ia = inicio
             time.sleep(max(0.0, 2.0 - (time.monotonic() - inicio)))
     except KeyboardInterrupt:
         _log.info("Worker detenido.")
