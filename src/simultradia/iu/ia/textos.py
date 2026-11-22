@@ -5,10 +5,10 @@ La volatilidad NO usa verde ni rojo (no significa «bueno» ni «malo»): solo l
 """
 import math
 from datetime import date, datetime
-from typing import Optional, Sequence
+from typing import Dict, List, Optional, Sequence
 
 from simultradia.analisis.volatilidad import NOMBRES_FEATURES
-from simultradia.domain.entities.prediccion_volatilidad_entity import PrediccionVolatilidad
+from simultradia.domain.entities.prediccion_volatilidad_entity import PrediccionVolatilidad, SenalVolatilidad
 from simultradia.domain.enums import NivelVolatilidad
 from simultradia.domain.reglas.volatilidad import PERCENTIL_ALTO, PERCENTIL_BAJO, VENTANA_NIVEL, VENTANA_NORMAL, Z_MINIMO
 from simultradia.ia.volatilidad import BinCalibracion, Evaluacion
@@ -17,6 +17,7 @@ _ESPACIO = " "
 
 AVISO = "Estimación estadística con fines educativos. No es asesoría financiera."
 
+_TITULO_NIVEL = {NivelVolatilidad.BAJA: "TRANQUILO", NivelVolatilidad.NORMAL: "NORMAL", NivelVolatilidad.ALTA: "AGITADO"}
 _NIVEL = {NivelVolatilidad.BAJA: "Baja", NivelVolatilidad.NORMAL: "Normal", NivelVolatilidad.ALTA: "Alta"}
 _FACTOR = dict(zip(NOMBRES_FEATURES, (
     "Rango de hoy", "Rango medio 3 días", "Rango medio 5 días", "Rango medio 10 días", "Rango medio 20 días",
@@ -77,12 +78,6 @@ def etiqueta_resultado(p: PrediccionVolatilidad) -> str:
     return "" if p.acierto_nivel is None else "alza" if p.acierto_nivel else "baja"
 
 
-def frase_nivel(n: NivelVolatilidad) -> str:
-    return {NivelVolatilidad.BAJA: "Se espera un día tranquilo: el precio oscilaría menos de lo habitual.",
-            NivelVolatilidad.NORMAL: "Se espera un día de oscilación habitual para este activo.",
-            NivelVolatilidad.ALTA: "Se espera un día agitado: el precio oscilaría más de lo habitual."}[n]
-
-
 def explicacion_nivel() -> str:
     return ("El nivel compara el rango esperado con los últimos %d días de ESTE activo: «baja» es del 25 %% más "
             "tranquilo, «alta» del 25 %% más agitado y «normal» lo demás." % VENTANA_NIVEL)
@@ -119,16 +114,125 @@ def nombre_modelo(version: str) -> str:
     return "Modelo de volatilidad · versión %s" % version.lstrip("v")
 
 
-def lectura_validacion(ev: Evaluacion) -> str:
-    """Lo que dicen los números de la validación, para quien no sabe qué es un z."""
-    texto = ("En datos que no había visto, el modelo se equivoca en promedio %s del rango. Repetir el rango de hoy "
-             "se equivoca %s y usar el promedio de %d días, %s." % (
-                 error_pct(ev.error), error_pct(ev.error_hoy), VENTANA_NORMAL, error_pct(ev.error_media)))
+# ---------------------------------------------------------------------------- pestaña Volatilidad
+def titulo_nivel(n: NivelVolatilidad) -> str:
+    """«AGITADO», «NORMAL» o «TRANQUILO»: el nivel en grande."""
+    return _TITULO_NIVEL[n]
+
+
+def frase_percentil(n: NivelVolatilidad) -> str:
+    """Qué significa el nivel, tal como se calcula: contra los últimos %d días del propio activo."""
+    return {NivelVolatilidad.BAJA: "Más tranquilo que 3 de cada 4 días de los últimos %d." % VENTANA_NIVEL,
+            NivelVolatilidad.NORMAL: "Dentro de lo habitual de los últimos %d días." % VENTANA_NIVEL,
+            NivelVolatilidad.ALTA: "Más agitado que 3 de cada 4 días de los últimos %d." % VENTANA_NIVEL}[n]
+
+
+def frase_hoy(p: PrediccionVolatilidad) -> str:
+    """Lo que se movió hoy y qué espera la IA para mañana, comparado."""
+    razon = p.rango_hoy / p.rango_normal if p.rango_normal else 1.0
+    if p.rango_predicho > p.rango_hoy * 1.1:
+        manana = "La IA espera que mañana se mueva más."
+    elif p.rango_predicho < p.rango_hoy * 0.9:
+        manana = "La IA espera que mañana se mueva menos."
+    else:
+        manana = "La IA espera algo parecido mañana."
+    return "Es %s. %s" % (veces(razon), manana)
+
+
+def uso_tamano(p: PrediccionVolatilidad) -> str:
+    base = "Tamaño de la operación. "
+    if p.nivel == NivelVolatilidad.ALTA:
+        return base + ("Con un rango esperado de %s (%s) la misma cantidad de dinero arriesga más: conviene operar "
+                       "menos cantidad." % (rango(p.rango_predicho), veces(p.veces_lo_normal)))
+    if p.nivel == NivelVolatilidad.BAJA:
+        return base + ("Se espera poco movimiento (%s): el mismo dinero arriesga menos que de costumbre." %
+                       rango(p.rango_predicho))
+    return base + "Se espera un movimiento habitual (%s): no hay motivo para cambiar el tamaño de siempre." % rango(
+        p.rango_predicho)
+
+
+def uso_stop(p: PrediccionVolatilidad) -> str:
+    return ("Stop-loss. Uno más pegado al precio que el rango esperado (%s) tiene mucha probabilidad de saltar solo "
+            "por el vaivén del día." % rango(p.rango_predicho))
+
+
+def uso_direccion() -> str:
+    return "No dice si sube o baja. Sirve para medir el riesgo, no para elegir dirección."
+
+
+def frase_intervalo_corta(p: PrediccionVolatilidad) -> str:
+    return "Casi seguro entre %s y %s" % (rango(p.rango_bajo), rango(p.rango_alto))
+
+
+def texto_umbrales(p: PrediccionVolatilidad) -> str:
+    return "Menos de %s = día tranquilo. Más de %s = día agitado (según sus últimos %d días)." % (
+        rango(p.umbral_bajo), rango(p.umbral_alto), VENTANA_NIVEL)
+
+
+# ---------------------------------------------------------------------------- escáner
+FILTROS = (("todos", "Todos"), ("alta", "Alta"), ("normal", "Normal"), ("baja", "Baja"))
+
+
+def filtrar(senales: Sequence[SenalVolatilidad], filtro: str) -> List[SenalVolatilidad]:
+    if filtro == "todos":
+        return list(senales)
+    return [s for s in senales if s.prediccion.nivel.value == filtro]
+
+
+def conteos(senales: Sequence[SenalVolatilidad]) -> Dict[str, int]:
+    cuentas = {clave: 0 for clave, _t in FILTROS}
+    cuentas["todos"] = len(senales)
+    for s in senales:
+        cuentas[s.prediccion.nivel.value] += 1
+    return cuentas
+
+
+def etiqueta_nivel(n: NivelVolatilidad) -> str:
+    """Color de la fila del escáner: naranja si es agitado, celeste si es tranquilo, normal si no."""
+    return {NivelVolatilidad.ALTA: "alerta", NivelVolatilidad.BAJA: "calma"}.get(n, "")
+
+
+# ---------------------------------------------------------------------------- pestaña Evaluación
+def titulo_veredicto(ev: Evaluacion) -> str:
     if ev.supera_base:
-        return texto + " Le gana a las dos con claridad: no parece casualidad."
+        return "Aprobado"
     if ev.z_hoy >= Z_MINIMO or ev.z_media >= Z_MINIMO:
-        return texto + " Solo le gana a una de las dos: no alcanza para activarlo."
-    return texto + " No le gana a las bases con claridad: la diferencia podría ser casualidad."
+        return "Aprobado solo a medias"
+    return "No aprobado"
+
+
+def explicacion_veredicto(ev: Evaluacion, inicio_ordinal: int, fin_ordinal: int) -> str:
+    probado = ("probado en %d periodos del pasado con datos que no había visto (%s)" % (
+        len(ev.tramos), periodo(inicio_ordinal, fin_ordinal)))
+    if ev.supera_base:
+        return ("Predice mejor el rango del día que las dos alternativas simples, %s. Por eso queda activo." % probado)
+    if ev.z_hoy >= Z_MINIMO or ev.z_media >= Z_MINIMO:
+        return ("Le gana a una de las dos alternativas simples pero no a la otra, %s. No alcanza para activarlo." %
+                probado)
+    return ("No le gana con claridad a las alternativas simples, %s: la diferencia podría ser casualidad. "
+            "No se activa." % probado)
+
+
+def ejemplo_error(error_log: float) -> str:
+    """Qué significa «±38 %» con un caso concreto: un día de 2,0 %."""
+    f = math.exp(error_log)
+    return ("«%s» quiere decir: si un día el rango real es 2,0 %%, el modelo suele haber predicho entre %s y %s." % (
+        error_pct(error_log), rango(0.02 / f), rango(0.02 * f)))
+
+
+def tramos_ganados(ev: Evaluacion) -> int:
+    return sum(1 for t in ev.tramos if t.error < t.error_hoy and t.error < t.error_media)
+
+
+def siempre_normal() -> float:
+    """Acierto de decir siempre «normal»: es la parte de días entre los dos percentiles."""
+    return (PERCENTIL_ALTO - PERCENTIL_BAJO) / 100.0
+
+
+def lectura_nivel(ev: Evaluacion) -> str:
+    return ("Acertar el nivel es difícil: el modelo %s a decir siempre «normal», porque la mitad de los días lo son. "
+            "Fíate más del número del rango, que es lo que realmente se evalúa." % (
+                "apenas supera" if ev.acierto_nivel > siempre_normal() else "no supera"))
 
 
 def lectura_calibracion(bins: Sequence[BinCalibracion]) -> str:
@@ -138,15 +242,33 @@ def lectura_calibracion(bins: Sequence[BinCalibracion]) -> str:
         return "Todavía no hay suficientes predicciones en cada grupo para comparar."
     menos, mas = con_datos[0], con_datos[-1]
     if mas.real > menos.real * 1.05:
-        return ("Sí: cuando espera un día más agitado, realmente lo es (%s frente a %s en los días que esperaba "
-                "tranquilos). Por eso la predicción distingue días tranquilos de agitados." % (
-                    veces(mas.real), veces(menos.real)))
-    return "No: lo que espera el modelo apenas se parece a lo que ocurre. Conviene no fiarse de la predicción."
+        texto = ("Sí distingue: cuando espera un día %s, de verdad es %s; cuando espera uno %s, %s." % (
+            mas.etiqueta.lower(), veces(mas.real).replace(" lo normal", ""),
+            menos.etiqueta.lower(), veces(menos.real).replace(" lo normal", "")))
+        sesgo = sum(b.real - b.predicho for b in con_datos) / len(con_datos)
+        if abs(sesgo) >= 0.05:
+            texto += " Además es un poco %s: lo real sale en promedio %s por %s de lo esperado." % (
+                "conservador" if sesgo > 0 else "exagerado", numero(abs(sesgo), 1) + "×",
+                "encima" if sesgo > 0 else "debajo")
+        return texto
+    return "No distingue: lo que espera el modelo apenas se parece a lo que ocurre. Conviene no fiarse de la predicción."
 
 
-def lectura_nivel(ev: Evaluacion) -> str:
-    return ("Acertó el nivel (baja / normal / alta) el %s de las veces; repetir el nivel de hoy acierta el %s. "
-            "Como «baja» y «alta» son el %d %% de días cada una, decir siempre «normal» acertaría cerca del %d %%: "
-            "el nivel es una guía, el número es lo que se evalúa." % (
-                pct(ev.acierto_nivel), pct(ev.acierto_nivel_hoy), int(PERCENTIL_BAJO),
-                int(PERCENTIL_ALTO - PERCENTIL_BAJO)))
+# ---------------------------------------------------------------------------- pestaña Registro
+def diferencia_pp(p: PrediccionVolatilidad) -> str:
+    """Real menos predicho, en puntos porcentuales: «+0,3 pp»."""
+    if p.rango_real is None:
+        return "—"
+    return numero((p.rango_real - p.rango_predicho) * 100, 1, con_signo=True) + " pp"
+
+
+def niveles(p: PrediccionVolatilidad) -> str:
+    """«Alta → Normal»: el nivel que se esperaba y el que fue."""
+    return "%s → %s" % (nivel(p.nivel), nivel(p.nivel_real) if p.nivel_real else "—")
+
+
+def error_contra_hoy(mejora: Optional[float]) -> str:
+    """La mejora frente a repetir el rango de hoy como cambio del error: 0,21 -> «−21 %»."""
+    if mejora is None:
+        return "—"
+    return ("−" if mejora >= 0 else "+") + pct(abs(mejora))

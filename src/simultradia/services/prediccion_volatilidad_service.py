@@ -11,8 +11,8 @@ Nada de aquí llama a APIs externas ni entrena: el entrenamiento está en `Model
 """
 import logging
 import math
-from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from dataclasses import dataclass, field
+from datetime import date, datetime, timedelta, timezone
 from typing import Callable, List, Optional, Tuple
 
 from simultradia.analisis.montecarlo import Proyeccion, proyectar as proyectar_precio
@@ -35,6 +35,7 @@ _ANTIGUEDAD_MAXIMA_CRIPTO = timedelta(days=2)   # la última vela cerrada debe s
 _ANTIGUEDAD_MAXIMA = timedelta(days=5)          # lo demás: cubre fin de semana y algún feriado
 _FACTORES = 5
 _HISTORIAL = 30                         # predicciones pasadas que se muestran por activo
+_DIAS_GRAFICO = 30                      # rangos recientes que dibuja la pestaña Volatilidad
 _VELAS_PROYECCION = 300
 
 
@@ -55,6 +56,8 @@ class ResumenVolatilidad:
 class DetalleActivoVolatilidad:
     vigente: Optional[PrediccionVolatilidad]   # la predicción de hoy (None si no hay)
     historial: List[PrediccionVolatilidad]     # de la más nueva a la más vieja
+    rangos_recientes: List[float] = field(default_factory=list)   # rango de las últimas velas cerradas (la última es «hoy»)
+    fechas_recientes: List[date] = field(default_factory=list)    # el día (UTC) de cada una de esas velas
 
 
 class PrediccionVolatilidadService:
@@ -153,7 +156,10 @@ class PrediccionVolatilidadService:
             vigente = next((s.prediccion for s in self._predicciones.ultimas_por_activo(conn)
                             if s.prediccion.id_activo == id_activo), None)
             historial = self._predicciones.historial(conn, id_activo, _HISTORIAL)
-        return DetalleActivoVolatilidad(vigente, historial)
+            velas = self._precios.buscar_velas(conn, id_activo, IntervaloVela.D1, _VELAS_A_LEER)
+        cerradas = velas_cerradas(velas, self._ahora())[-_DIAS_GRAFICO:]
+        fechas = [v.momento.astimezone(timezone.utc).date() for v in cerradas]
+        return DetalleActivoVolatilidad(vigente, historial, rangos(cerradas), fechas)
 
     def estado_ciclo(self, actor: Usuario) -> EstadoCiclo:
         """Cómo va el ciclo de predicciones (administración)."""

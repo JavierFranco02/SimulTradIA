@@ -2,6 +2,8 @@
 
   - dibujar_proyeccion: el abanico de precios posibles de Monte Carlo (5-95 %, 25-75 % y mediana).
   - dibujar_tramos: error del modelo contra las dos bases en cada periodo de la validación (menos es mejor).
+  - dibujar_ultimos_dias: el rango de los últimos días y el esperado para mañana (con su intervalo).
+  - dibujar_calibracion: lo que esperaba el modelo contra lo que pasó, en cinco grupos de días.
   - dibujar_historial: rango predicho (con su intervalo) contra el rango real de un activo, día a día.
 """
 import math
@@ -121,4 +123,78 @@ def dibujar_historial(figura, historial: Sequence[PrediccionVolatilidad]) -> Non
     ejes.set_xticklabels([textos.fecha(orden[x].generada_en)[:5] for x in marcas])
     ejes.yaxis.set_major_formatter(FuncFormatter(lambda v, _p: "%s %%" % ("%.1f" % v).replace(".", ",")))
     ejes.legend(loc="lower left", bbox_to_anchor=(0, 1.0), ncol=3, frameon=False, labelcolor=Palette.TEXTO,
+                fontsize=Palette.TAMANO_TEXTO)
+
+
+def dibujar_ultimos_dias(figura, rangos: Sequence[float], prediccion: Optional[PrediccionVolatilidad],
+                         fechas: Sequence = ()) -> None:
+    """Barras con el rango de los últimos días, una barra aparte para mañana con su intervalo del 80 %, y tres
+    líneas de referencia: el promedio de 20 días y los umbrales de «baja» y «alta». Si se dan las fechas, se escribe
+    la de una barra sí y otra no, para tener una referencia del día."""
+    figura.clear()
+    figura.set_facecolor(Palette.FONDO)
+    if not rangos or prediccion is None:
+        _vacio(figura, "Sin datos para dibujar.")
+        return
+    ejes = figura.add_subplot(1, 1, 1)
+    figura.subplots_adjust(left=0.07, right=0.98, top=0.97, bottom=0.25)
+    _estilizar(ejes)
+    ejes.grid(False, axis="x")
+    n = len(rangos)
+    xs = list(range(n))
+    ejes.bar(xs, [r * 100 for r in rangos], width=0.75, color=Palette.GRILLA)
+    ejes.bar([n - 1], [rangos[-1] * 100], width=0.75, color=Palette.TEXTO)        # «hoy», un poco más claro
+    manana = n + 1
+    ejes.bar([manana], [prediccion.rango_predicho * 100], width=0.75, color=Palette.ALERTA)
+    ejes.vlines(manana, prediccion.rango_bajo * 100, prediccion.rango_alto * 100, color="white", linewidth=1.6)
+    for extremo in (prediccion.rango_bajo, prediccion.rango_alto):
+        ejes.hlines(extremo * 100, manana - 0.3, manana + 0.3, color="white", linewidth=1.6)
+    lineas = []
+    for valor, color, estilo, nombre in (
+            (prediccion.rango_normal, "white", "--", "Promedio 20 días (%s)" % textos.rango(prediccion.rango_normal)),
+            (prediccion.umbral_alto, Palette.ALERTA, "--", "Desde aquí: alta (%s)" % textos.rango(prediccion.umbral_alto)),
+            (prediccion.umbral_bajo, Palette.CALMA, ":", "Hasta aquí: baja (%s)" % textos.rango(prediccion.umbral_bajo))):
+        lineas.append(ejes.axhline(valor * 100, color=color, linestyle=estilo, linewidth=1.2, label=nombre))
+    ejes.set_xlim(-0.8, manana + 0.9)
+    if len(fechas) == n:
+        posiciones = list(range(n - 3, -1, -2))[::-1]            # una barra sí y otra no, contando desde «hoy»
+        etiquetas = [fechas[i].strftime("%d/%m") for i in posiciones]
+    else:
+        posiciones, etiquetas = [0], ["hace %d días" % (n - 1)]
+    ejes.set_xticks(posiciones + [n - 1, manana])
+    ejes.set_xticklabels(etiquetas + ["hoy", "mañana"])
+    ejes.yaxis.set_major_formatter(FuncFormatter(lambda v, _p: ("%.1f" % v).replace(".", ",") + " %"))
+    ejes.legend(handles=lineas, loc="upper center", bbox_to_anchor=(0.5, -0.12), ncol=3, frameon=False,
+                labelcolor=Palette.TEXTO, fontsize=Palette.TAMANO_TEXTO)
+
+
+def dibujar_calibracion(figura, grupos: Sequence) -> None:
+    """Para cada grupo de días (de más tranquilo a más agitado según el modelo): barra gris con lo esperado y
+    barra azul con lo que pasó de verdad, en veces lo normal."""
+    figura.clear()
+    figura.set_facecolor(Palette.FONDO)
+    if not grupos:
+        _vacio(figura, "Sin validación todavía.")
+        return
+    ejes = figura.add_subplot(1, 1, 1)
+    figura.subplots_adjust(left=0.17, right=0.95, top=0.97, bottom=0.2)
+    _estilizar(ejes)
+    ejes.grid(False, axis="y")
+    ys = list(range(len(grupos)))[::-1]                      # el primer grupo arriba
+    alto = 0.34
+    ejes.barh([y + alto / 2 for y in ys], [g.predicho for g in grupos], height=alto, color=Palette.GRILLA,
+              label="Lo que esperaba el modelo")
+    ejes.barh([y - alto / 2 for y in ys], [g.real for g in grupos], height=alto, color=Palette.EMA,
+              label="Lo que pasó de verdad")
+    for y, g in zip(ys, grupos):
+        ejes.annotate(textos.numero(g.predicho, 1) + "×", xy=(g.predicho, y + alto / 2), xytext=(3, 0),
+                      textcoords="offset points", va="center", color=Palette.TEXTO, fontsize=Palette.TAMANO_TEXTO)
+        ejes.annotate(textos.numero(g.real, 1) + "×", xy=(g.real, y - alto / 2), xytext=(3, 0),
+                      textcoords="offset points", va="center", color="white", fontsize=Palette.TAMANO_TEXTO)
+    ejes.axvline(1.0, color=Palette.TEXTO, linestyle=":", linewidth=0.8)
+    ejes.set_yticks(ys)
+    ejes.set_yticklabels(["Un día %s" % g.etiqueta.lower() for g in grupos])
+    ejes.set_xlim(0, max(max(g.predicho, g.real) for g in grupos) * 1.2)
+    ejes.set_xlabel("veces lo normal (1,0× = un día habitual)", color=Palette.TEXTO, fontsize=Palette.TAMANO_TEXTO)
+    ejes.legend(loc="lower left", bbox_to_anchor=(0, 1.0), ncol=2, frameon=False, labelcolor=Palette.TEXTO,
                 fontsize=Palette.TAMANO_TEXTO)

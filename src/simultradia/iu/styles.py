@@ -25,8 +25,8 @@ class Colors:
     SUCCESS = "success"
     DANGER = "danger"
     WARNING = "warning"
-    SURFACE = "dark"                 # fondo de la ventana de formularios (más claro que el de la tarjeta)
     INFO = "info"
+    SURFACE = "dark"                 # fondo de la ventana de formularios (más claro que el de la tarjeta)
 
 
 class Palette:
@@ -34,6 +34,8 @@ class Palette:
     y las etiquetas de la tabla. Van acordes al tema oscuro `darkly`. No se usa en widgets."""
     ALZA = "#00bc8c"                 # verde: sube
     BAJA = "#e74c3c"                 # rojo: baja
+    ALERTA = "#f39c12"               # naranja: día agitado (no es bueno ni malo)
+    CALMA = "#5bc0de"                # celeste: día tranquilo
     FONDO = "#222222"
     GRILLA = "#444444"
     TEXTO = "#adb5bd"

@@ -38,7 +38,45 @@ class PruebasTextos(unittest.TestCase):
     def test_niveles_y_frases(self):
         self.assertEqual(textos.nivel(N.ALTA), "Alta")
         for n in N:
-            self.assertTrue(textos.frase_nivel(n))
+            self.assertTrue(textos.frase_percentil(n))
+        self.assertEqual(textos.titulo_nivel(N.ALTA), "AGITADO")
+        self.assertIn("3 de cada 4", textos.frase_percentil(N.ALTA))
+        self.assertNotIn("75", textos.frase_percentil(N.ALTA))
+
+    def test_filtros_y_conteos_del_escaner(self):
+        class S:
+            def __init__(self, n):
+                self.prediccion = _p(nivel=n)
+        senales = [S(N.ALTA), S(N.ALTA), S(N.NORMAL), S(N.BAJA)]
+        self.assertEqual(textos.conteos(senales), {"todos": 4, "alta": 2, "normal": 1, "baja": 1})
+        self.assertEqual(len(textos.filtrar(senales, "todos")), 4)
+        self.assertEqual(len(textos.filtrar(senales, "alta")), 2)
+        self.assertEqual(textos.filtrar(senales, "baja")[0].prediccion.nivel, N.BAJA)
+        self.assertEqual([textos.etiqueta_nivel(n) for n in N], ["calma", "", "alerta"]
+                         if list(N) == [N.BAJA, N.NORMAL, N.ALTA] else [textos.etiqueta_nivel(n) for n in N])
+
+    def test_frases_de_la_pestana_volatilidad(self):
+        p = _p(rango_hoy=0.03, rango_predicho=0.023)
+        self.assertIn("1,5× lo normal", textos.frase_hoy(p))
+        self.assertIn("menos", textos.frase_hoy(p))
+        self.assertIn("1,2 %", textos.texto_umbrales(p))
+        self.assertIn("2,6 %", textos.texto_umbrales(p))
+        self.assertIn("2,3 %", textos.uso_tamano(p))
+        self.assertIn("No dice si sube o baja", textos.uso_direccion())
+
+    def test_registro_diferencia_niveles_y_error(self):
+        self.assertEqual(textos.diferencia_pp(_p()), "—")
+        self.assertEqual(textos.diferencia_pp(_p(rango_real=0.026)), "+0,3 pp")
+        self.assertEqual(textos.niveles(_p(nivel=N.ALTA, nivel_real=N.NORMAL)), "Alta → Normal")
+        self.assertEqual(textos.niveles(_p()), "Normal → —")
+        self.assertEqual(textos.error_contra_hoy(0.21), "−21 %")
+        self.assertEqual(textos.error_contra_hoy(-0.1), "+10 %")
+        self.assertEqual(textos.error_contra_hoy(None), "—")
+
+    def test_ejemplo_del_error(self):
+        self.assertIn("2,0 %", textos.ejemplo_error(0.405465))
+        self.assertIn("±50 %", textos.ejemplo_error(0.405465))
+        self.assertAlmostEqual(textos.siempre_normal(), 0.5)
 
     def test_resultado_del_registro(self):
         self.assertEqual(textos.resultado(_p()), "Pendiente")

@@ -10,7 +10,8 @@ from simultradia.analisis.montecarlo import proyectar
 from simultradia.domain.entities.prediccion_volatilidad_entity import PrediccionVolatilidad
 from simultradia.domain.enums import NivelVolatilidad
 from simultradia.ia.volatilidad import armar_dataset, entrenar
-from simultradia.iu.ia.graficos import dibujar_historial, dibujar_proyeccion, dibujar_tramos
+from simultradia.iu.ia.graficos import (dibujar_calibracion, dibujar_historial, dibujar_proyeccion, dibujar_tramos,
+                                       dibujar_ultimos_dias)
 from tests.ia.vol_fakes import AHORA, crear_modelo_prueba, velas_vol
 
 
@@ -48,6 +49,29 @@ class PruebasGraficosIA(unittest.TestCase):
         figura = Figure()
         dibujar_historial(figura, historial)
         self.assertTrue(_png(figura).startswith(b"\x89PNG"))
+
+    def test_ultimos_dias_con_y_sin_prediccion(self):
+        p = PrediccionVolatilidad(1, 1, AHORA, AHORA, Decimal(100), 0.02, 0.015, 0.03, 0.02, 0.02, 0.01, 0.03,
+                                  NivelVolatilidad.ALTA)
+        for prediccion in (p, None):
+            figura = Figure()
+            dibujar_ultimos_dias(figura, [0.01 + 0.0005 * i for i in range(30)], prediccion)
+            self.assertTrue(_png(figura).startswith(b"\x89PNG"))
+        figura = Figure()
+        fechas = [(AHORA - timedelta(days=30 - i)).date() for i in range(30)]
+        dibujar_ultimos_dias(figura, [0.01] * 30, p, fechas)
+        self.assertEqual(figura.axes[0].get_xticklabels()[-1].get_text(), "mañana")
+        self.assertTrue(_png(figura).startswith(b"\x89PNG"))
+        figura = Figure()
+        dibujar_ultimos_dias(figura, [], None)
+        self.assertTrue(_png(figura).startswith(b"\x89PNG"))
+
+    def test_calibracion(self):
+        ev = entrenar(armar_dataset({i: velas_vol(700, i) for i in (1, 2)}), crear_modelo_prueba).evaluacion
+        for grupos in (ev.calibracion, []):
+            figura = Figure()
+            dibujar_calibracion(figura, grupos)
+            self.assertTrue(_png(figura).startswith(b"\x89PNG"))
 
 
 if __name__ == "__main__":

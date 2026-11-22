@@ -3,8 +3,8 @@
     tabla = DataTable(padre, [("ticker", "Activo", 200, "w"), ("precio", "Precio", 120, "e")])
     tabla.establecer_filas([("5", ("BTC/USDT", "67 123,45"), "alza")])
 
-Cada fila es (id, textos de cada columna, etiqueta). La etiqueta ("alza", "baja" o "") pinta
-el texto de verde o rojo. Al refrescar, las filas se actualizan EN SU LUGAR: no se pierde la
+Cada fila es (id, textos de cada columna, etiqueta). La etiqueta pinta el texto de TODA la fila:
+"alza" (verde), "baja" (rojo), "alerta" (naranja), "calma" (celeste) o "" (normal). Al refrescar, las filas se actualizan EN SU LUGAR: no se pierde la
 fila seleccionada ni el desplazamiento aunque la tabla se renueve cada pocos segundos.
 """
 from typing import Callable, Optional, Sequence, Tuple
@@ -31,6 +31,8 @@ class DataTable(ttk.Frame):
             self._tabla.column(clave, width=ancho, anchor=ancla)
         self._tabla.tag_configure("alza", foreground=Palette.ALZA)
         self._tabla.tag_configure("baja", foreground=Palette.BAJA)
+        self._tabla.tag_configure("alerta", foreground=Palette.ALERTA)
+        self._tabla.tag_configure("calma", foreground=Palette.CALMA)
         barra = ttk.Scrollbar(self, orient="vertical", command=self._tabla.yview)
         self._tabla.configure(yscrollcommand=barra.set)
         self._tabla.pack(side="left", fill="both", expand=True)

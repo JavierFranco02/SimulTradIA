@@ -187,6 +187,10 @@ class PruebasPrediccionVolatilidadService(unittest.TestCase):
         detalle = self.servicio.detalle(1)
         self.assertEqual(detalle.vigente.id_activo, 1)
         self.assertEqual(len(detalle.historial), 1)
+        self.assertTrue(0 < len(detalle.rangos_recientes) <= 30)
+        self.assertTrue(all(r >= 0 for r in detalle.rangos_recientes))
+        self.assertEqual(len(detalle.fechas_recientes), len(detalle.rangos_recientes))
+        self.assertEqual(detalle.fechas_recientes, sorted(detalle.fechas_recientes))
         self.assertEqual(self.servicio.estado_ciclo(ADMIN).de_hoy, 3)
         with self.assertRaises(ErrorPermisos):
             self.servicio.estado_ciclo(NORMAL)

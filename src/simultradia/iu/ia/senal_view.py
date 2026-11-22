@@ -1,17 +1,19 @@
 """Pestaña «Volatilidad»: cuánto se espera que se mueva el activo mañana, en qué nivel está y qué datos lo explican.
 
-De arriba abajo, en secciones con borde: la conclusión (rango esperado, nivel e intervalo), la comparación con lo de
-hoy y lo normal, y los datos que más pesaron. Vista pasiva: IAController le entrega la predicción vigente.
+De arriba abajo, en secciones con borde: la conclusión (nivel, rango esperado e intervalo) con el gráfico de los
+últimos días, tres cuadros (hoy, lo normal, umbrales) y los datos que más pesaron junto a cómo se puede usar. Vista pasiva: IAController le entrega la predicción vigente.
 """
 import ttkbootstrap as ttk
 
 from simultradia.domain.enums import NivelVolatilidad as N
-from simultradia.iu.components import BarList, MetricGrid, ScrollFrame, Seccion
+from simultradia.iu.components import BarList, FigureView, ScrollFrame, Seccion
 from simultradia.iu.formato import precio
 from simultradia.iu.ia import textos
+from simultradia.iu.ia.graficos import dibujar_ultimos_dias
 from simultradia.iu.styles import Colors, Fonts, Palette, Spacing
 
 _ESTILO = {N.BAJA: Colors.INFO, N.NORMAL: Colors.PRIMARY, N.ALTA: Colors.WARNING}   # ni verde ni rojo
+_ANCHO_RESUMEN = 260      # ancho del texto del resumen de la izquierda, en píxeles
 
 
 class SenalView(ttk.Frame):
@@ -28,34 +30,33 @@ class SenalView(ttk.Frame):
         self._nombre = ttk.Label(c, text="", font=Fonts.SUBTITLE)
         self._nombre.pack(anchor="w", pady=(0, Spacing.MD))
 
-        conclusion = Seccion(c, "Qué se espera para el próximo día", textos.explicacion_rango())
-        conclusion.pack(fill="x", pady=(0, Spacing.MD))
-        fila = ttk.Frame(conclusion.cuerpo)         # la sección empaqueta (pack): la cuadrícula va en un marco propio
-        fila.pack(fill="x")
-        fila.columnconfigure(0, weight=1)
-        izquierda = ttk.Frame(fila)
-        izquierda.grid(row=0, column=0, sticky="nw")
-        ttk.Label(izquierda, text="RANGO ESPERADO", font=Fonts.SMALL).pack(anchor="w")
-        self._rango = ttk.Label(izquierda, text="", font=Fonts.DISPLAY)
-        self._rango.pack(anchor="w")
-        self._intervalo = ttk.Label(izquierda, text="", font=Fonts.SUBTITLE)
-        self._intervalo.pack(anchor="w")
-        self._frase = ttk.Label(izquierda, text="", font=Fonts.BODY, wraplength=520, justify="left")
-        self._frase.pack(anchor="w", pady=(Spacing.XS, 0))
-        self._referencia = ttk.Label(izquierda, text="", font=Fonts.SMALL)
-        self._referencia.pack(anchor="w", pady=(Spacing.XS, 0))
-        derecha = ttk.Frame(fila)
-        derecha.grid(row=0, column=1, sticky="ne", padx=(Spacing.LG, Spacing.MD))
-        ttk.Label(derecha, text="NIVEL", font=Fonts.SMALL).pack(anchor="e")
-        self._nivel = ttk.Label(derecha, text="", font=Fonts.DISPLAY)
-        self._nivel.pack(anchor="e")
-        self._veces = ttk.Label(derecha, text="", font=Fonts.SUBTITLE)
-        self._veces.pack(anchor="e")
+        ttk.Label(c, text=textos.explicacion_rango(), font=Fonts.SMALL, wraplength=900, justify="left").pack(
+            anchor="w", pady=(0, Spacing.SM))
+        resumen = ttk.Frame(c)
+        resumen.pack(fill="x", pady=(0, Spacing.MD))
+        self._nivel, self._frase = self._tarjeta(resumen, 0, "Mañana se espera un día", Fonts.DISPLAY)
+        self._rango, self._intervalo = self._tarjeta(resumen, 1, "Rango esperado (máximo − mínimo)", Fonts.DISPLAY)
+        self._veces, self._normal = self._tarjeta(resumen, 2, "Frente a lo normal", Fonts.DISPLAY)
 
-        comparacion = Seccion(c, "Comparación", textos.explicacion_nivel())
-        comparacion.pack(fill="x", pady=(0, Spacing.MD))
-        self._metricas = MetricGrid(comparacion.cuerpo, columnas=4)
-        self._metricas.pack(fill="x")
+        conclusion = Seccion(c, "Últimos 30 días y mañana", "Cada barra es cuánto se movió el precio ese día.")
+        conclusion.pack(fill="x", pady=(0, Spacing.MD))
+        self._grafico = FigureView(conclusion.cuerpo, dibujar_ultimos_dias, alto=260)
+        self._grafico.pack(fill="x")
+        self._referencia = ttk.Label(conclusion.cuerpo, text="", font=Fonts.SMALL)
+        self._referencia.pack(anchor="w", pady=(Spacing.SM, 0))
+
+        tres = ttk.Frame(c)
+        tres.pack(fill="x", pady=(0, Spacing.MD))
+        self._cuadros = []
+        for columna, titulo in enumerate(("Hoy se movió", "Lo normal", "Umbrales")):
+            tres.columnconfigure(columna, weight=1, uniform="cuadro")
+            seccion = Seccion(tres, titulo, "", ancho_texto=260)
+            seccion.grid(row=0, column=columna, sticky="nsew", padx=(0 if columna == 0 else Spacing.SM, 0))
+            valor = ttk.Label(seccion.cuerpo, text="", font=Fonts.VALUE)
+            valor.pack(anchor="w")
+            detalle = ttk.Label(seccion.cuerpo, text="", font=Fonts.SMALL, wraplength=260, justify="left")
+            detalle.pack(anchor="w", pady=(Spacing.XS, 0))
+            self._cuadros.append((valor, detalle))
 
         self._seccion_factores = Seccion(c, "Qué datos pesaron en esta predicción", "")
         self._seccion_factores.pack(fill="x")
@@ -67,6 +68,26 @@ class SenalView(ttk.Frame):
         self._sin_factores = ttk.Label(cuerpo, text="Los factores no están disponibles para esta predicción.",
                                        font=Fonts.BODY)
         self._factores.pack(fill="x")
+
+        self._seccion_uso = Seccion(c, "Cómo se puede usar", "")
+        self._seccion_uso.pack(fill="x", pady=(Spacing.MD, 0))
+        self._usos = []
+        for _ in range(3):
+            etiqueta = ttk.Label(self._seccion_uso.cuerpo, text="", font=Fonts.BODY, wraplength=900, justify="left")
+            etiqueta.pack(anchor="w", pady=(0, Spacing.XS))
+            self._usos.append(etiqueta)
+
+    @staticmethod
+    def _tarjeta(fila, columna: int, titulo: str, fuente):
+        """Una tarjetita del resumen: título, cifra grande y una línea de apoyo. Va al lado de las otras."""
+        fila.columnconfigure(columna, weight=1, uniform="resumen")
+        seccion = Seccion(fila, titulo, "", ancho_texto=_ANCHO_RESUMEN)
+        seccion.grid(row=0, column=columna, sticky="nsew", padx=(0 if columna == 0 else Spacing.SM, 0))
+        cifra = ttk.Label(seccion.cuerpo, text="", font=fuente)
+        cifra.pack(anchor="w")
+        apoyo = ttk.Label(seccion.cuerpo, text="", font=Fonts.SMALL, wraplength=_ANCHO_RESUMEN, justify="left")
+        apoyo.pack(anchor="w", pady=(Spacing.XS, 0))
+        return cifra, apoyo
 
     def limpiar(self, texto: str = "Elige un activo del escáner.") -> None:
         self._marco.pack_forget()
@@ -84,17 +105,22 @@ class SenalView(ttk.Frame):
         self._nombre.configure(text=nombre)
         self._rango.configure(text=textos.rango(p.rango_predicho))
         self._intervalo.configure(text=textos.frase_intervalo(p))
-        self._frase.configure(text="%s %s" % (textos.frase_nivel(p.nivel), textos.frase_normal(p)))
+        self._veces.configure(text=textos.numero(p.veces_lo_normal, 1) + "×")
+        self._normal.configure(text="Lo normal (promedio de %s) es %s." % (textos.dias(20), textos.rango(p.rango_normal)))
+        self._frase.configure(text=textos.frase_percentil(p.nivel))
         self._referencia.configure(text="Precio de referencia %s · se comprueba el %s"
                                    % (precio(p.precio_referencia), textos.fecha(p.fecha_objetivo)))
-        self._nivel.configure(text=textos.nivel(p.nivel).upper(), bootstyle=_ESTILO[p.nivel])
-        self._veces.configure(text=textos.veces(p.veces_lo_normal))
-        self._metricas.establecer([
-            ("Rango esperado", textos.rango(p.rango_predicho)),
-            ("Rango de hoy", textos.rango(p.rango_hoy)),
-            ("Promedio de 20 días", textos.rango(p.rango_normal)),
-            ("Umbral baja / alta", "%s / %s" % (textos.rango(p.umbral_bajo), textos.rango(p.umbral_alto))),
-        ])
+        self._nivel.configure(text=textos.titulo_nivel(p.nivel), bootstyle=_ESTILO[p.nivel])
+        self._grafico.mostrar(list(detalle.rangos_recientes), p, list(detalle.fechas_recientes))
+        (v1, d1), (v2, d2), (v3, d3) = self._cuadros
+        v1.configure(text=textos.rango(p.rango_hoy))
+        d1.configure(text=textos.frase_hoy(p))
+        v2.configure(text=textos.rango(p.rango_normal))
+        d2.configure(text="Promedio de los últimos %s." % textos.dias(20))
+        v3.configure(text="%s · %s" % (textos.rango(p.umbral_bajo), textos.rango(p.umbral_alto)))
+        d3.configure(text=textos.texto_umbrales(p))
+        for etiqueta, texto in zip(self._usos, (textos.uso_tamano(p), textos.uso_stop(p), textos.uso_direccion())):
+            etiqueta.configure(text=texto)
         self._mostrar_factores(detalle.vigente.factores)
 
     def _mostrar_factores(self, factores) -> None:

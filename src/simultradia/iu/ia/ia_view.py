@@ -1,17 +1,17 @@
 """Pantalla «Predicciones IA»: el escáner de activos a la izquierda y, a la derecha, las pestañas del activo elegido.
 
-  - Escáner: los activos con predicción vigente, del día más agitado al más tranquilo esperado (frente a lo normal).
+  - Escáner: los activos con predicción vigente, ordenados por ticker (de la A a la Z); filtro por nivel arriba.
   - Pestañas: Volatilidad · Proyección de precio · Evaluación · Registro vs. realidad.
 Si no hay modelo activo, en lugar de las pestañas se explica por qué.
 
 Vista pasiva: IAController decide qué pedir y le entrega los datos.
 """
+import tkinter as tk
 from typing import Callable, Dict, Optional, Tuple
 
 import ttkbootstrap as ttk
 
 from simultradia.analisis.montecarlo import Proyeccion
-from simultradia.ia.volatilidad_serializacion import desde_dict
 from simultradia.iu.base.panel_view import PanelView
 from simultradia.iu.components import DataTable
 from simultradia.iu.ia import textos
@@ -19,15 +19,15 @@ from simultradia.iu.ia.evaluacion_view import EvaluacionView
 from simultradia.iu.ia.proyeccion_view import ProyeccionView
 from simultradia.iu.ia.registro_view import RegistroView
 from simultradia.iu.ia.senal_view import SenalView
-from simultradia.iu.styles import Fonts, Spacing
+from simultradia.iu.styles import ButtonStyle, Fonts, Spacing, texto_normal
 
 _COLUMNAS = (
-    ("ticker", "Activo", 90, "w"),
-    ("rango", "Rango", 70, "e"),
-    ("nivel", "Nivel", 70, "w"),
+    ("ticker", "Activo", 100, "w"),
+    ("rango", "Rango", 80, "e"),
+    ("nivel", "Nivel", 80, "w"),
     ("veces", "vs. normal", 90, "e"),
 )
-_ANCHO_ESCANER = 360
+_ANCHO_ESCANER = 420
 
 
 class IAView(PanelView):
@@ -35,6 +35,7 @@ class IAView(PanelView):
         super().__init__(parent, padding=Spacing.MD)
         self._al_elegir_activo: Optional[Callable[[int], None]] = None
         self._activos: Dict[int, Tuple[str, str]] = {}    # id del activo -> (ticker, nombre) de los del escáner
+        self._senales: list = []                          # todas las del escáner; el filtro decide cuáles se ven
 
         cabecera = ttk.Frame(self)
         cabecera.pack(fill="x", pady=(0, Spacing.SM))
@@ -49,7 +50,18 @@ class IAView(PanelView):
         cuerpo.columnconfigure(1, weight=1)
 
         izquierda = ttk.Frame(cuerpo)
-        ttk.Label(izquierda, text="Escáner (de más a menos agitado)", font=Fonts.VALUE).pack(anchor="w", pady=(0, Spacing.XS))
+        ttk.Label(izquierda, text="Escáner (por activo, de la A a la Z)", font=Fonts.VALUE).pack(anchor="w", pady=(0, Spacing.XS))
+        filtros = ttk.Frame(izquierda)
+        filtros.pack(fill="x", pady=(0, Spacing.XS))
+        self._filtro = tk.StringVar(master=self, value="todos")
+        self._botones = {}
+        for columna, (clave, texto) in enumerate(textos.FILTROS):
+            filtros.columnconfigure(columna, weight=1, uniform="filtro")
+            boton = ttk.Radiobutton(filtros, text=texto, value=clave, variable=self._filtro,
+                                    command=self._pulsar_filtro, bootstyle=ButtonStyle.TOGGLE)
+            boton.grid(row=0, column=columna, sticky="ew")
+            texto_normal(boton)
+            self._botones[clave] = boton
         self._escaner = DataTable(izquierda, _COLUMNAS)
         self._escaner.pack(fill="both", expand=True)
         self._escaner.al_seleccionar(self._pulsar_activo)
@@ -86,22 +98,36 @@ class IAView(PanelView):
                                             "superó a las dos bases (repetir el rango de hoy y el promedio de 20 "
                                             "días). Un administrador puede entrenarlo en «Modelos de IA».")
             self._sin_modelo.pack(expand=True)
-            self._escaner.establecer_filas([])
+            self._senales = []
+            self._pintar_escaner()
             self._pie.configure(text="")
             return
         self._sin_modelo.pack_forget()
         if not self._pestanas.winfo_ismapped():
             self._pestanas.pack(fill="both", expand=True)
-        filas = []
-        for s in resumen.senales:
-            p = s.prediccion
-            self._activos[p.id_activo] = (s.ticker, s.nombre)
-            filas.append((str(p.id_activo), (s.ticker, textos.rango(p.rango_predicho), textos.nivel(p.nivel),
-                                             textos.veces(p.veces_lo_normal).replace(" lo normal", "")), ""))
-        self._escaner.establecer_filas(filas)
-        self._pie.configure(text="%d activos con predicción" % len(filas) if filas else "Sin predicciones todavía.")
+        self._senales = list(resumen.senales)
+        for senal in self._senales:
+            self._activos[senal.prediccion.id_activo] = (senal.ticker, senal.nombre)
+        self._pintar_escaner()
         self.evaluacion.mostrar(resumen.modelo)
-        self.registro.mostrar_precision(resumen.precision, desde_dict(resumen.modelo.metricas))
+        self.registro.mostrar_precision(resumen.precision)
+
+    def _pintar_escaner(self) -> None:
+        cuentas = textos.conteos(self._senales)
+        for clave, texto in textos.FILTROS:
+            self._botones[clave].configure(text="%s (%d)" % (texto, cuentas[clave]))
+        vistas = sorted(textos.filtrar(self._senales, self._filtro.get()), key=lambda s: s.ticker.upper())
+        self._escaner.establecer_filas([
+            (str(s.prediccion.id_activo),
+             (s.ticker, textos.rango(s.prediccion.rango_predicho), textos.nivel(s.prediccion.nivel),
+              textos.numero(s.prediccion.veces_lo_normal, 1) + "×"),
+             textos.etiqueta_nivel(s.prediccion.nivel))
+            for s in vistas])
+        self._pie.configure(text=("%d activos con predicción" % len(self._senales)) if self._senales
+                            else "Sin predicciones todavía.")
+
+    def _pulsar_filtro(self) -> None:
+        self._pintar_escaner()
 
     def seleccionar(self, id_activo: int) -> None:
         self._escaner.seleccionar(str(id_activo))
