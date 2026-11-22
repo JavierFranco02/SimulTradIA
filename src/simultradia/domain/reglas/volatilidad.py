@@ -4,7 +4,7 @@ Se predice el RANGO del día siguiente: (máximo - mínimo) / cierre de la vela 
 Python puro: lo comparten el motor, los servicios y las pantallas.
 """
 import math
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import List, Optional, Sequence
 
 from simultradia.domain.enums import NivelVolatilidad, TipoActivo
@@ -59,11 +59,31 @@ def intervalo_80(rango: float, sigma_log: float) -> tuple:
     return rango * math.exp(-MARGEN_INTERVALO * sigma_log), rango * math.exp(MARGEN_INTERVALO * sigma_log)
 
 
+def a_utc(momento: datetime) -> datetime:
+    """El mismo instante en UTC. Una hora sin zona se toma como UTC.
+
+    Las velas diarias empiezan a las 00:00 UTC, pero PostgreSQL las devuelve en la zona de la sesión (por ejemplo
+    -03: el día anterior a las 21:00). El día de una vela y su día de la semana son los de UTC, no los locales."""
+    if momento.tzinfo is None:
+        return momento.replace(tzinfo=timezone.utc)
+    return momento.astimezone(timezone.utc)
+
+
+def dia_utc(momento: datetime) -> date:
+    """El día (UTC) al que pertenece la vela que empieza en `momento`."""
+    return a_utc(momento).date()
+
+
 def fecha_objetivo(momento_vela: datetime, tipo: TipoActivo) -> datetime:
     """Cuándo se puede evaluar la predicción hecha con la vela que empieza en `momento_vela`: al cerrar la
     vela del día siguiente (cripto: todos los días; lo demás: de lunes a viernes; los feriados no se conocen:
-    la evaluación espera a que esa vela exista)."""
-    dia = momento_vela + timedelta(days=1)
+    la evaluación espera a que esa vela exista). Se devuelve en UTC."""
+    dia = a_utc(momento_vela) + timedelta(days=1)
     while tipo != TipoActivo.CRIPTO and dia.weekday() >= 5:
         dia += timedelta(days=1)
     return dia + timedelta(days=1)
+
+
+def dia_de_la_vela_objetivo(fecha: datetime) -> date:
+    """El día de la vela que se compara con la predicción (la `fecha_objetivo` es cuando esa vela cierra)."""
+    return dia_utc(fecha) - timedelta(days=1)

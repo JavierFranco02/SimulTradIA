@@ -10,7 +10,8 @@ from typing import Dict, List, Optional, Sequence
 from simultradia.analisis.volatilidad import NOMBRES_FEATURES
 from simultradia.domain.entities.prediccion_volatilidad_entity import PrediccionVolatilidad, SenalVolatilidad
 from simultradia.domain.enums import NivelVolatilidad
-from simultradia.domain.reglas.volatilidad import PERCENTIL_ALTO, PERCENTIL_BAJO, VENTANA_NIVEL, VENTANA_NORMAL, Z_MINIMO
+from simultradia.domain.reglas.volatilidad import (
+    PERCENTIL_ALTO, PERCENTIL_BAJO, VENTANA_NIVEL, VENTANA_NORMAL, Z_MINIMO, dia_de_la_vela_objetivo)
 from simultradia.ia.volatilidad import BinCalibracion, Evaluacion
 
 _ESPACIO = " "
@@ -65,6 +66,15 @@ def factor(nombre: str) -> str:
 
 def fecha(momento: Optional[datetime]) -> str:
     return "—" if momento is None else momento.astimezone().strftime("%d/%m/%Y")
+
+
+_DIAS_SEMANA = ("lun", "mar", "mié", "jue", "vie", "sáb", "dom")
+
+
+def dia_de_vela(fecha_objetivo: datetime) -> str:
+    """«lun 23/11»: el día de la vela con la que se comprueba una predicción (día de mercado, no hora local)."""
+    dia = dia_de_la_vela_objetivo(fecha_objetivo)
+    return "%s %s" % (_DIAS_SEMANA[dia.weekday()], dia.strftime("%d/%m"))
 
 
 def resultado(p: PrediccionVolatilidad) -> str:

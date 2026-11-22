@@ -73,6 +73,13 @@ class PruebasTextos(unittest.TestCase):
         self.assertEqual(textos.error_contra_hoy(-0.1), "+10 %")
         self.assertEqual(textos.error_contra_hoy(None), "—")
 
+    def test_dia_de_la_vela_de_comprobacion(self):
+        from datetime import datetime, timedelta, timezone
+        local = timezone(timedelta(hours=-3))
+        # martes 24/11 00:00 UTC (= lun 23/11 21:00 -03): se compara con la vela del lunes 23/11
+        self.assertEqual(textos.dia_de_vela(datetime(2026, 11, 23, 21, 0, tzinfo=local)), "lun 23/11")
+        self.assertEqual(textos.dia_de_vela(datetime(2026, 11, 24, tzinfo=timezone.utc)), "lun 23/11")
+
     def test_ejemplo_del_error(self):
         self.assertIn("2,0 %", textos.ejemplo_error(0.405465))
         self.assertIn("±50 %", textos.ejemplo_error(0.405465))

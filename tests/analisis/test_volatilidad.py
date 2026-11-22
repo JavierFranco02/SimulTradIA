@@ -1,7 +1,8 @@
 """Pruebas de las features y del objetivo de volatilidad: sin mirar el futuro y con la razón bien armada."""
 import math
 import unittest
-from datetime import timedelta
+from dataclasses import replace
+from datetime import timedelta, timezone
 from decimal import Decimal
 
 from simultradia.analisis.volatilidad import (
@@ -54,6 +55,13 @@ class PruebasVolatilidadFeatures(unittest.TestCase):
         i, j = 150, 157                                    # misma posición una semana después
         self.assertAlmostEqual(filas[i][-2], filas[j][-2])
         self.assertAlmostEqual(filas[i][-1], filas[j][-1])
+
+
+    def test_el_dia_de_la_semana_es_el_de_utc_aunque_la_hora_venga_en_menos_3(self):
+        local = timezone(timedelta(hours=-3))
+        velas = velas_vol(300, 1)
+        en_local = [replace(v, momento=v.momento.astimezone(local)) for v in velas]   # lo que devuelve PostgreSQL
+        self.assertEqual(calcular_features(velas), calcular_features(en_local))
 
 
 if __name__ == "__main__":

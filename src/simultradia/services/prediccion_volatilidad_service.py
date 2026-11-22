@@ -25,7 +25,7 @@ from simultradia.domain.entities.prediccion_volatilidad_entity import (
 from simultradia.domain.entities.usuario_entity import Usuario
 from simultradia.domain.enums import IntervaloVela, TipoActivo, TipoModeloIA
 from simultradia.domain.reglas.volatilidad import (
-    VENTANA_NIVEL, fecha_objetivo, intervalo_80, nivel_de, umbrales_de)
+    VENTANA_NIVEL, dia_utc, fecha_objetivo, intervalo_80, nivel_de, umbrales_de)
 from simultradia.ia.volatilidad import explicar, predecir
 from simultradia.services.permisos import exigir_admin
 
@@ -97,6 +97,9 @@ class PrediccionVolatilidadService:
             if fila is None or umbrales is None:
                 omitidas += 1
                 continue
+            if fecha_objetivo(cerradas[-1].momento, activo.tipo) <= ahora:
+                omitidas += 1                    # la vela objetivo ya habría cerrado: no es una predicción
+                continue
             for modelo, entrenado in cargados:
                 if activo.id_activo in hechas[modelo.id_modelo]:
                     continue
@@ -158,7 +161,7 @@ class PrediccionVolatilidadService:
             historial = self._predicciones.historial(conn, id_activo, _HISTORIAL)
             velas = self._precios.buscar_velas(conn, id_activo, IntervaloVela.D1, _VELAS_A_LEER)
         cerradas = velas_cerradas(velas, self._ahora())[-_DIAS_GRAFICO:]
-        fechas = [v.momento.astimezone(timezone.utc).date() for v in cerradas]
+        fechas = [dia_utc(v.momento) for v in cerradas]
         return DetalleActivoVolatilidad(vigente, historial, rangos(cerradas), fechas)
 
     def estado_ciclo(self, actor: Usuario) -> EstadoCiclo:

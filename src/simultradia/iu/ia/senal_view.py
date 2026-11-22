@@ -108,8 +108,8 @@ class SenalView(ttk.Frame):
         self._veces.configure(text=textos.numero(p.veces_lo_normal, 1) + "×")
         self._normal.configure(text="Lo normal (promedio de %s) es %s." % (textos.dias(20), textos.rango(p.rango_normal)))
         self._frase.configure(text=textos.frase_percentil(p.nivel))
-        self._referencia.configure(text="Precio de referencia %s · se comprueba el %s"
-                                   % (precio(p.precio_referencia), textos.fecha(p.fecha_objetivo)))
+        self._referencia.configure(text="Precio de referencia %s · se comprueba con la vela del %s"
+                                   % (precio(p.precio_referencia), textos.dia_de_vela(p.fecha_objetivo)))
         self._nivel.configure(text=textos.titulo_nivel(p.nivel), bootstyle=_ESTILO[p.nivel])
         self._grafico.mostrar(list(detalle.rangos_recientes), p, list(detalle.fechas_recientes))
         (v1, d1), (v2, d2), (v3, d3) = self._cuadros

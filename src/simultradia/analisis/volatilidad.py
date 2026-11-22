@@ -8,7 +8,7 @@ import math
 from typing import List, Optional, Sequence
 
 from simultradia.domain.entities.vela_entity import Vela
-from simultradia.domain.reglas.volatilidad import HORIZONTE, PISO_RANGO, VENTANA_NORMAL
+from simultradia.domain.reglas.volatilidad import HORIZONTE, PISO_RANGO, VENTANA_NORMAL, dia_utc
 
 NOMBRES_FEATURES = (
     "lr_hoy", "lr_media_3", "lr_media_5", "lr_media_10", "lr_media_20", "lr_media_60", "lr_media_120",
@@ -85,7 +85,7 @@ def calcular_features(velas: Sequence[Vela]) -> List[Optional[List[float]]]:
         lr = {k: math.log(medias[k][i]) for k in medias}
         maximo_60 = max(c[i - 59:i + 1])
         momento = velas[i].momento
-        angulo = 2.0 * math.pi * momento.weekday() / 7.0
+        angulo = 2.0 * math.pi * dia_utc(momento).weekday() / 7.0
         filas[i] = [
             math.log(r[i]), lr[3], lr[5], lr[10], lr[20], lr[60], lr[120],
             lr[3] - lr[20], lr[20] - lr[120],

@@ -25,7 +25,7 @@ from simultradia.domain.entities.vela_entity import Vela
 from simultradia.domain.enums import NivelVolatilidad
 from simultradia.domain.reglas.volatilidad import (
     FRACCION_ENTRENAMIENTO_INICIAL, HORIZONTE, TRAMOS_VALIDACION, VENTANA_NIVEL, Z_MINIMO,
-    nivel_de, umbrales_de, velas_de_purga)
+    dia_utc, nivel_de, umbrales_de, velas_de_purga)
 
 MIN_FILAS_ACTIVO = 30                # un activo solo se compara si tiene al menos estas filas de prueba
 _ETIQUETAS_CALIBRACION = ("Muy tranquilo", "Tranquilo", "Normal", "Agitado", "Muy agitado")
@@ -157,7 +157,7 @@ def armar_dataset(velas_por_activo: Dict[int, Sequence[Vela]], horizonte: int = 
                 continue
             X.append(fila)
             y.append(objetivo)
-            dias.append(vela.momento.date().toordinal())
+            dias.append(dia_utc(vela.momento).toordinal())
             ids.append(id_activo)
             ln_normal.append(fila[INDICE_NORMAL])
             ln_hoy.append(fila[0])

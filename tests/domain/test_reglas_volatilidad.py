@@ -1,10 +1,10 @@
 """Pruebas de las reglas de volatilidad: niveles, umbrales, intervalo y fecha objetivo."""
 import unittest
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from simultradia.domain.enums import NivelVolatilidad as N, TipoActivo
 from simultradia.domain.reglas.volatilidad import (
-    fecha_objetivo, intervalo_80, nivel_de, percentil, umbrales_de, velas_de_purga)
+    a_utc, dia_de_la_vela_objetivo, dia_utc, fecha_objetivo, intervalo_80, nivel_de, percentil, umbrales_de, velas_de_purga)
 
 
 class PruebasReglasVolatilidad(unittest.TestCase):
@@ -39,6 +39,21 @@ class PruebasReglasVolatilidad(unittest.TestCase):
     def test_fecha_objetivo_de_una_accion_salta_el_fin_de_semana(self):
         viernes = datetime(2026, 11, 20, tzinfo=timezone.utc)
         self.assertEqual(fecha_objetivo(viernes, TipoActivo.ACCION), datetime(2026, 11, 24, tzinfo=timezone.utc))
+
+    def test_fecha_objetivo_con_la_hora_de_la_sesion_en_menos_3(self):
+        # La vela del viernes 20/11 empieza a las 00:00 UTC; PostgreSQL la devuelve como «jue 19/11 21:00 -03».
+        local = timezone(timedelta(hours=-3))
+        vela = datetime(2026, 11, 19, 21, 0, tzinfo=local)
+        self.assertEqual(dia_utc(vela), date(2026, 11, 20))
+        self.assertEqual(fecha_objetivo(vela, TipoActivo.ETF), datetime(2026, 11, 24, tzinfo=timezone.utc))
+        self.assertEqual(fecha_objetivo(vela, TipoActivo.CRIPTO), datetime(2026, 11, 22, tzinfo=timezone.utc))
+        self.assertEqual(fecha_objetivo(vela, TipoActivo.ETF), fecha_objetivo(a_utc(vela), TipoActivo.ETF))
+
+    def test_hora_sin_zona_se_toma_como_utc(self):
+        self.assertEqual(a_utc(datetime(2026, 11, 20)), datetime(2026, 11, 20, tzinfo=timezone.utc))
+
+    def test_dia_de_la_vela_objetivo(self):
+        self.assertEqual(dia_de_la_vela_objetivo(datetime(2026, 11, 24, tzinfo=timezone.utc)), date(2026, 11, 23))
 
     def test_purga(self):
         self.assertEqual(velas_de_purga(1), 5)
