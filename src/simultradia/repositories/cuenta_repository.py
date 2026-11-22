@@ -1,6 +1,6 @@
 """Acceso a la tabla "cuentas_simuladas". Aquí vive TODO el SQL de cuentas."""
 from decimal import Decimal
-from typing import Optional
+from typing import List, Optional
 
 from simultradia.domain.entities.cuenta_simulada_entity import CuentaSimulada
 
@@ -39,6 +39,14 @@ class CuentaRepository:
         """Para el worker, que ejecuta órdenes pendientes de cuentas sin tener a su usuario delante."""
         return self._buscar(conn, "WHERE id_cuenta = %s", (id_cuenta,), bloquear)
 
+    def listar_operables(self, conn) -> List[CuentaSimulada]:
+        """De TODOS los usuarios: las cuentas con las que se opera (activas y no de replay). Lo usa el worker
+        para guardar la foto del patrimonio."""
+        with conn.cursor() as cur:
+            cur.execute("SELECT " + _COLUMNAS + " FROM cuentas_simuladas "
+                        "WHERE activa AND NOT es_replay ORDER BY id_cuenta")
+            return [self._a_entidad(fila) for fila in cur.fetchall()]
+
     def actualizar_saldo(self, conn, id_cuenta: int, saldo: Decimal) -> bool:
         with conn.cursor() as cur:
             cur.execute("UPDATE cuentas_simuladas SET saldo_disponible = %s WHERE id_cuenta = %s",
@@ -51,8 +59,10 @@ class CuentaRepository:
         with conn.cursor() as cur:
             cur.execute(sql, parametros)
             fila = cur.fetchone()
-        if fila is None:
-            return None
+        return CuentaRepository._a_entidad(fila) if fila else None
+
+    @staticmethod
+    def _a_entidad(fila) -> CuentaSimulada:
         return CuentaSimulada(
             id_cuenta=fila.id_cuenta, id_usuario=fila.id_usuario, nombre=fila.nombre,
             moneda=fila.moneda.strip(),            # CHAR(3) puede traer relleno

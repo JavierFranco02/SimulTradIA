@@ -9,6 +9,7 @@ from simultradia.iu.components.card import Card
 from simultradia.iu.components.data_table import DataTable
 from simultradia.iu.components.dialog import Dialogo
 from simultradia.iu.components.figure_view import FigureView
+from simultradia.iu.components.equity_chart import EquityChart
 from simultradia.iu.components.form_field import FormField
 from simultradia.iu.components.medidor import Medidor
 from simultradia.iu.components.metric_grid import MetricGrid
@@ -27,6 +28,7 @@ __all__ = [
     "DataTable",
     "Dialogo",
     "FigureView",
+    "EquityChart",
     "FormField",
     "Medidor",
     "MetricGrid",

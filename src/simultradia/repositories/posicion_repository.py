@@ -63,6 +63,23 @@ class PosicionRepository:
             o.id_operacion_cerrada = cur.fetchone().id_operacion_cerrada
         return o
 
+    def listar_operaciones_cerradas(self, conn, id_cuenta: int) -> List[OperacionCerrada]:
+        """Todas las ventas de la cuenta, de la más nueva a la más vieja, con el ticker del activo."""
+        with conn.cursor() as cur:
+            cur.execute(
+                """SELECT o.id_operacion_cerrada, o.id_cuenta, o.id_activo, a.ticker, o.cantidad,
+                          o.precio_entrada, o.precio_salida, o.comisiones, o.ganancia_realizada,
+                          o.abierta_en, o.cerrada_en
+                   FROM operaciones_cerradas o JOIN activos a ON a.id_activo = o.id_activo
+                   WHERE o.id_cuenta = %s
+                   ORDER BY o.cerrada_en DESC, o.id_operacion_cerrada DESC""", (id_cuenta,))
+            return [OperacionCerrada(
+                id_operacion_cerrada=f.id_operacion_cerrada, id_cuenta=f.id_cuenta, id_activo=f.id_activo,
+                ticker=f.ticker, cantidad=f.cantidad, precio_entrada=f.precio_entrada,
+                precio_salida=f.precio_salida, comisiones=f.comisiones,
+                ganancia_realizada=f.ganancia_realizada, abierta_en=f.abierta_en, cerrada_en=f.cerrada_en)
+                for f in cur.fetchall()]
+
     @staticmethod
     def _a_entidad(f) -> Posicion:
         return Posicion(id_posicion=f.id_posicion, id_cuenta=f.id_cuenta, id_activo=f.id_activo,

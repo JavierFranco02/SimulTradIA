@@ -9,6 +9,7 @@ from simultradia.iu.ia import pantallas as ia
 from simultradia.iu.inicio import pantallas as inicio
 from simultradia.iu.mercado import pantallas as mercado
 from simultradia.iu.operar import pantallas as operar
+from simultradia.iu.portafolio import pantallas as portafolio
 from simultradia.iu.shell import pantallas as shell
 
 
@@ -19,4 +20,5 @@ def registrar_pantallas(navegador) -> None:
     mercado.registrar(navegador)
     ia.registrar(navegador)
     operar.registrar(navegador)
+    portafolio.registrar(navegador)
     admin.registrar(navegador)

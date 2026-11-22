@@ -6,6 +6,7 @@
 Cada fila es (id, textos de cada columna, etiqueta). La etiqueta pinta el texto de TODA la fila:
 "alza" (verde), "baja" (rojo), "alerta" (naranja), "calma" (celeste) o "" (normal). Al refrescar, las filas se actualizan EN SU LUGAR: no se pierde la
 fila seleccionada ni el desplazamiento aunque la tabla se renueve cada pocos segundos.
+`alto` (opcional) son las filas que se ven a la vez: sirve para tablas chicas de tamaño fijo (por ejemplo, 4).
 """
 from typing import Callable, Optional, Sequence, Tuple
 

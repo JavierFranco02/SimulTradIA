@@ -6,7 +6,8 @@ Se ejecuta en una terminal aparte, mientras la app está abierta:
 
   - cada 2 segundos: precio actual de todos los activos (lo que ve Mercado y el gráfico en vivo) y,
     con esos precios, las órdenes límite que llegaron a su precio y los stop-loss / take-profit disparados
-  - cada 60 segundos: velas nuevas (la primera vez descarga todo el historial; puede tardar)
+  - cada 60 segundos: velas nuevas (la primera vez descarga todo el historial; puede tardar) y la foto del
+    patrimonio de cada cuenta (la curva de Portafolio; una fila por minuto)
   - cada hora: evalúa las predicciones de volatilidad vencidas y genera la del día (si ya hay un modelo activo)
 
 Solo PROGRAMA cuándo corre cada tarea; el trabajo está en jobs/ y en los servicios.
@@ -24,7 +25,7 @@ from simultradia.core.logging_config import configurar_logging
 from simultradia.core.settings import SETTINGS
 from simultradia.jobs import (
     actualizar_cotizaciones_job, actualizar_velas_job, evaluar_ordenes_job, evaluar_volatilidad_job,
-    generar_volatilidad_job)
+    generar_volatilidad_job, guardar_snapshots_job)
 
 _log = logging.getLogger("worker")
 
@@ -44,6 +45,7 @@ def main() -> int:
     servicios = crear_servicios(db)
 
     ultima_pasada_velas = float("-inf")
+    ultima_foto = float("-inf")
     hilo_velas = None
     ultima_pasada_ia = float("-inf")
     hilo_ia = None
@@ -53,6 +55,10 @@ def main() -> int:
             inicio = time.monotonic()
             actualizar_cotizaciones_job.ejecutar(servicios)
             evaluar_ordenes_job.ejecutar(servicios)
+            # La foto del patrimonio va después de los precios (usa los recién guardados) y es corta.
+            if inicio - ultima_foto >= 60:
+                guardar_snapshots_job.ejecutar(servicios)
+                ultima_foto = inicio
             # Las velas van en su propio hilo: la primera descarga tarda y no debe frenar los precios.
             if inicio - ultima_pasada_velas >= 60 and not (hilo_velas and hilo_velas.is_alive()):
                 hilo_velas = threading.Thread(

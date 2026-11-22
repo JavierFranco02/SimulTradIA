@@ -24,6 +24,7 @@ from simultradia.repositories.orden_repository import OrdenRepository
 from simultradia.repositories.posicion_repository import PosicionRepository
 from simultradia.repositories.prediccion_volatilidad_repository import PrediccionVolatilidadRepository
 from simultradia.repositories.precio_repository import PrecioRepository
+from simultradia.repositories.snapshot_repository import SnapshotRepository
 from simultradia.repositories.usuario_repository import UsuarioRepository
 from simultradia.services.activo_admin_service import ActivoAdminService
 from simultradia.services.fuente_admin_service import FuenteAdminService
@@ -33,6 +34,7 @@ from simultradia.services.mercado_service import MercadoService
 from simultradia.services.modelo_volatilidad_service import ModeloVolatilidadService
 from simultradia.services.operar_service import OperarService
 from simultradia.services.prediccion_volatilidad_service import PrediccionVolatilidadService
+from simultradia.services.portafolio_service import PortafolioService
 from simultradia.services.usuario_admin_service import UsuarioAdminService
 from simultradia.services.usuario_service import UsuarioService
 
@@ -49,12 +51,13 @@ class Servicios:
     operar: OperarService
     volatilidad: PrediccionVolatilidadService
     modelo_volatilidad: ModeloVolatilidadService
+    portafolio: PortafolioService
 
 
 def crear_servicios(db) -> Servicios:
     usuarios, activos, cuentas = UsuarioRepository(), ActivoRepository(), CuentaRepository()
-    precios, fuentes = PrecioRepository(), FuenteRepository()
     modelos, predicciones, almacen = ModeloIARepository(), PrediccionVolatilidadRepository(), AlmacenModelos(PROJECT_ROOT)
+    precios, fuentes, posiciones = PrecioRepository(), FuenteRepository(), PosicionRepository()
     clientes = {cliente.NOMBRE: cliente for cliente in (BinanceCliente(), YahooCliente())}
     return Servicios(
         usuario=UsuarioService(db, usuarios, cuentas),
@@ -64,7 +67,9 @@ def crear_servicios(db) -> Servicios:
         ingesta=IngestaService(db, activos, precios, fuentes, clientes),
         activo_admin=ActivoAdminService(db, activos, precios, fuentes, clientes),
         fuente_admin=FuenteAdminService(db, fuentes),
-        operar=OperarService(db, cuentas, PosicionRepository(), OrdenRepository(), activos, precios),
+        operar=OperarService(db, cuentas, posiciones, OrdenRepository(), activos, precios),
+        portafolio=PortafolioService(db, cuentas, posiciones, activos, SnapshotRepository()),
         volatilidad=PrediccionVolatilidadService(db, activos, precios, modelos, predicciones, almacen),
         modelo_volatilidad=ModeloVolatilidadService(db, activos, precios, modelos, almacen),
+       
     )
