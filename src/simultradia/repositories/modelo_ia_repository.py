@@ -60,17 +60,22 @@ class ModeloIARepository:
             fila = cur.fetchone()
         return self._a_modelo(fila) if fila else None
 
-    def listar(self, conn, limite: int = 100) -> List[ModeloIA]:
+    def listar(self, conn, limite: int = 100, tipo: Optional[TipoModeloIA] = None) -> List[ModeloIA]:
+        """Las versiones, de la más nueva a la más vieja; `tipo` filtra por clase de modelo."""
         with conn.cursor() as cur:
-            cur.execute("SELECT " + _COLUMNAS + " FROM modelos_ia ORDER BY creado_en DESC, id_modelo DESC LIMIT %s",
-                        (limite,))
+            if tipo is None:
+                cur.execute("SELECT " + _COLUMNAS + " FROM modelos_ia "
+                            "ORDER BY creado_en DESC, id_modelo DESC LIMIT %s", (limite,))
+            else:
+                cur.execute("SELECT " + _COLUMNAS + " FROM modelos_ia WHERE tipo = %s "
+                            "ORDER BY creado_en DESC, id_modelo DESC LIMIT %s", (tipo.value, limite))
             return [self._a_modelo(f) for f in cur.fetchall()]
 
-    def listar_activos(self, conn) -> List[ModeloIA]:
-        """Los modelos de dirección que hoy generan predicciones (uno por horizonte)."""
+    def listar_activos(self, conn, tipo: TipoModeloIA = TipoModeloIA.DIRECCION) -> List[ModeloIA]:
+        """Los modelos de ese tipo que hoy generan predicciones (uno por horizonte)."""
         with conn.cursor() as cur:
             cur.execute("SELECT " + _COLUMNAS + " FROM modelos_ia "
-                        "WHERE estado = 'activo' AND tipo = 'direccion' ORDER BY horizonte_dias")
+                        "WHERE estado = 'activo' AND tipo = %s ORDER BY horizonte_dias", (tipo.value,))
             return [self._a_modelo(f) for f in cur.fetchall()]
 
     # ------------------------------------------------------- corridas de entrenamiento

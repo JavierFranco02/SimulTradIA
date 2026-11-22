@@ -22,7 +22,7 @@ from simultradia.repositories.fuente_repository import FuenteRepository
 from simultradia.repositories.modelo_ia_repository import ModeloIARepository
 from simultradia.repositories.orden_repository import OrdenRepository
 from simultradia.repositories.posicion_repository import PosicionRepository
-from simultradia.repositories.prediccion_repository import PrediccionRepository
+from simultradia.repositories.prediccion_volatilidad_repository import PrediccionVolatilidadRepository
 from simultradia.repositories.precio_repository import PrecioRepository
 from simultradia.repositories.usuario_repository import UsuarioRepository
 from simultradia.services.activo_admin_service import ActivoAdminService
@@ -30,9 +30,9 @@ from simultradia.services.fuente_admin_service import FuenteAdminService
 from simultradia.services.grafico_service import GraficoService
 from simultradia.services.ingesta_service import IngestaService
 from simultradia.services.mercado_service import MercadoService
-from simultradia.services.modelo_ia_service import ModeloIAService
+from simultradia.services.modelo_volatilidad_service import ModeloVolatilidadService
 from simultradia.services.operar_service import OperarService
-from simultradia.services.prediccion_service import PrediccionService
+from simultradia.services.prediccion_volatilidad_service import PrediccionVolatilidadService
 from simultradia.services.usuario_admin_service import UsuarioAdminService
 from simultradia.services.usuario_service import UsuarioService
 
@@ -47,14 +47,14 @@ class Servicios:
     activo_admin: ActivoAdminService
     fuente_admin: FuenteAdminService
     operar: OperarService
-    prediccion: PrediccionService
-    modelo_ia: ModeloIAService
+    volatilidad: PrediccionVolatilidadService
+    modelo_volatilidad: ModeloVolatilidadService
 
 
 def crear_servicios(db) -> Servicios:
     usuarios, activos, cuentas = UsuarioRepository(), ActivoRepository(), CuentaRepository()
     precios, fuentes = PrecioRepository(), FuenteRepository()
-    modelos, predicciones, almacen = ModeloIARepository(), PrediccionRepository(), AlmacenModelos(PROJECT_ROOT)
+    modelos, predicciones, almacen = ModeloIARepository(), PrediccionVolatilidadRepository(), AlmacenModelos(PROJECT_ROOT)
     clientes = {cliente.NOMBRE: cliente for cliente in (BinanceCliente(), YahooCliente())}
     return Servicios(
         usuario=UsuarioService(db, usuarios, cuentas),
@@ -65,6 +65,6 @@ def crear_servicios(db) -> Servicios:
         activo_admin=ActivoAdminService(db, activos, precios, fuentes, clientes),
         fuente_admin=FuenteAdminService(db, fuentes),
         operar=OperarService(db, cuentas, PosicionRepository(), OrdenRepository(), activos, precios),
-        prediccion=PrediccionService(db, activos, precios, modelos, predicciones, almacen),
-        modelo_ia=ModeloIAService(db, activos, precios, modelos, almacen),
+        volatilidad=PrediccionVolatilidadService(db, activos, precios, modelos, predicciones, almacen),
+        modelo_volatilidad=ModeloVolatilidadService(db, activos, precios, modelos, almacen),
     )

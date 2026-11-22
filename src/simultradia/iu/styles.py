@@ -26,6 +26,7 @@ class Colors:
     DANGER = "danger"
     WARNING = "warning"
     SURFACE = "dark"                 # fondo de la ventana de formularios (más claro que el de la tarjeta)
+    INFO = "info"
 
 
 class Palette:

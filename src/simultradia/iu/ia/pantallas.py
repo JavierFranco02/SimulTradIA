@@ -1,11 +1,11 @@
-"""Pantalla del módulo IA (sección dentro del shell): escáner de predicciones y detalle del activo."""
+"""Pantalla del módulo IA (sección dentro del shell): escáner de volatilidad y detalle del activo."""
 from simultradia.iu.ia.ia_controller import IAController
 from simultradia.iu.ia.ia_view import IAView
 
 
 def _ia(padre, nav):
     vista = IAView(padre)
-    IAController(vista, nav.servicios.prediccion).cargar()
+    IAController(vista, nav.servicios.volatilidad).cargar()
     return vista
 
 

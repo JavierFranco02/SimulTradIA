@@ -1,16 +1,15 @@
-"""Controlador de «Predicciones IA».
+"""Controlador de «Predicciones IA» (volatilidad).
 
-  - Al abrir y cada minuto pide el resumen (modelo activo, escáner y acierto real): las predicciones
+  - Al abrir y cada minuto pide el resumen (modelo activo, escáner y resultados reales): las predicciones
     cambian una vez al día, no hace falta más.
   - Elegir un activo pide su detalle (factores e historial) y su proyección; si en un refresco la predicción
     vigente de ese activo cambió (empezó otro día), el detalle se vuelve a pedir solo.
   - Cambiar de activo descarta las respuestas que llegan tarde.
-  - Cuando no hay activo elegido (al abrir) elige el de más confianza: la pantalla no empieza vacía.
+  - Cuando no hay activo elegido (al abrir) elige el más agitado esperado: la pantalla no empieza vacía.
 """
 from typing import Optional
 
 from simultradia.core.exceptions import ErrorAplicacion
-from simultradia.domain.reglas.prediccion import HORIZONTE
 from simultradia.iu.base.panel_controller import PanelController
 
 _CADA_MS = 60000
@@ -21,7 +20,6 @@ class IAController(PanelController):
     def __init__(self, vista, prediccion_service):
         super().__init__(vista)
         self._servicio = prediccion_service
-        self._horizonte = HORIZONTE
         self._id_activo: Optional[int] = None
         self._id_prediccion: Optional[int] = None      # la predicción vigente que muestra el detalle
         self._nivel: Optional[float] = None
@@ -67,8 +65,8 @@ class IAController(PanelController):
 
     def _pedir_resumen(self) -> None:
         self._peticion_resumen += 1
-        numero, horizonte = self._peticion_resumen, self._horizonte
-        self._ejecutar(lambda: self._servicio.resumen(horizonte),
+        numero = self._peticion_resumen
+        self._ejecutar(self._servicio.resumen,
                        al_terminar=lambda resumen: self._al_resumen(numero, resumen),
                        al_fallar=lambda error: self._avisar_una_vez("resumen", error))
 
@@ -83,24 +81,24 @@ class IAController(PanelController):
             if self._id_prediccion is not None and nueva != self._id_prediccion:
                 self._pedir_detalle()                # empezó otro día: el detalle mostrado quedó viejo
         elif resumen.senales:
-            elegido = resumen.senales[0].prediccion.id_activo        # vienen de mayor a menor confianza
+            elegido = resumen.senales[0].prediccion.id_activo        # vienen del más al menos agitado
             self.elegir_activo(elegido)
             self._vista.seleccionar(elegido)
 
     def _pedir_detalle(self) -> None:
         self._peticion_detalle += 1
-        numero, id_activo, horizonte = self._peticion_detalle, self._id_activo, self._horizonte
-        self._ejecutar(lambda: self._servicio.detalle(id_activo, horizonte),
-                       al_terminar=lambda detalle: self._al_detalle(numero, id_activo, horizonte, detalle),
+        numero, id_activo = self._peticion_detalle, self._id_activo
+        self._ejecutar(lambda: self._servicio.detalle(id_activo),
+                       al_terminar=lambda detalle: self._al_detalle(numero, id_activo, detalle),
                        al_fallar=lambda error: self._avisar_una_vez("detalle", error))
 
-    def _al_detalle(self, numero: int, id_activo: int, horizonte: int, detalle) -> None:
+    def _al_detalle(self, numero: int, id_activo: int, detalle) -> None:
         if numero != self._peticion_detalle:
             return
         self._recuperado("detalle")
         self._id_prediccion = detalle.vigente.id_prediccion if detalle.vigente else None
         ticker, nombre = self._vista.datos_de(id_activo)
-        self._vista.mostrar_detalle(ticker, nombre, horizonte, detalle)
+        self._vista.mostrar_detalle(ticker, nombre, detalle)
 
     def _pedir_proyeccion(self) -> None:
         self._peticion_proyeccion += 1

@@ -50,9 +50,10 @@ apalancamiento, guardar configuraciones de gráfico, exportar PDF/CSV.
 (hoy cada activo guarda su moneda al crearse y no se edita; ver decisión 43).
 
 ### Enfoque de la IA
-- Predicción de **dirección con probabilidades** (`prob_alcista + prob_bajista + prob_lateral = 1`) y confianza.
-  Se guarda el `precio_referencia` y la `fecha_objetivo`; al vencer, un proceso completa `direccion_real` y
-  `acierto`, y de ahí sale el historial.
+- **Desde la decisión 58 la IA real predice VOLATILIDAD** (el rango del día siguiente), no dirección. La predicción de
+  dirección (alcista/bajista/lateral, con probabilidades) quedó guardada y probada en `src/simultradia/experimental/direccion/`,
+  sin ejecutarse en la app. Se guarda el `precio_referencia` y la `fecha_objetivo`; al vencer, un proceso completa
+  `rango_real`, `nivel_real` y `acierto_nivel`, y de ahí sale el historial.
 - Empezar con **LightGBM** sobre indicadores, validar con **walk-forward** (entrenar con el pasado, probar con
   el futuro, en orden cronológico) y comparar contra una línea base. Explicaciones con SHAP.
 - Sentimiento de noticias con un modelo de lenguaje. El coach usa estadísticas simples y un modelo de lenguaje
@@ -182,10 +183,11 @@ src/simultradia/
                      ingesta_service · activo_admin_service · fuente_admin_service · operar_service · permisos.py ·
                      validacion.py
   clients/           binance_client.py (ccxt), yahoo_client.py (yfinance): solo traen datos
-  analisis/          velas.py (agrupar, aplicar precio), indicadores.py (SMA, EMA, Bollinger, RSI, MACD, ATR)
+  analisis/          velas.py (agrupar, aplicar precio, velas_cerradas), indicadores.py (SMA, EMA, Bollinger, RSI, MACD, ATR), volatilidad.py (22 features y objetivo del rango), montecarlo.py
   backtesting/       (previsto) motor de simulación puro (sin BD ni UI)
-  jobs/              actualizar_cotizaciones_job.py, actualizar_velas_job.py, evaluar_ordenes_job.py, generar_predicciones_job.py, evaluar_predicciones_job.py (el worker los repite; los de IA, cada hora)
-  ia/                entrenamiento.py (walk-forward, métricas, z, explicar, predecir), serializacion.py (Evaluacion <-> dict JSON), almacen.py (archivos del modelo en `modelos/`, ignorada por git)
+  jobs/              actualizar_cotizaciones_job.py, actualizar_velas_job.py, evaluar_ordenes_job.py, generar_volatilidad_job.py, evaluar_volatilidad_job.py (el worker los repite; los de IA, cada hora)
+  ia/                volatilidad.py (dataset, walk-forward, bases, z, calibración, explicar, predecir), volatilidad_serializacion.py (Evaluacion <-> dict JSON), almacen.py (archivos del modelo en `modelos/`, ignorada por git)
+  experimental/      direccion/: la IA de dirección (features, entrenamiento, servicios, repositorio, jobs, pantallas y administración) apartada. NO la importa la app ni el worker; sus pruebas están en tests/experimental/ y siguen corriendo
   iu/                interfaz de usuario, agrupada por funcionalidad
     styles.py        Fonts (incluye VALUE), Colors, Palette (SOLO gráfico y tabla), ButtonStyle (incluye SUCCESS),
                      Spacing, y `texto_normal(boton)` para los toggles
@@ -203,9 +205,9 @@ src/simultradia/
     inicio/          sección de bienvenida (PROVISIONAL: se rehace al final)
     mercado/         mercado_view (panel dividido + botón «Operar» debajo del gráfico), lista_view/lista_controller,
                      grafico_view (UN solo componente, sin modo compacto)/grafico_controller
-    ia/              ia_view (escáner a la izquierda + pestañas Señal · Proyección · Evaluación · Registro vs. realidad),
-                     ia_controller, senal_view, proyeccion_view, evaluacion_view, registro_view, textos.py (textos y
-                     reglas de presentación, puro), graficos.py (abanico de Monte Carlo y acierto por periodo, rotulado con fechas; matplotlib puro). Señal y Evaluación se explican en lenguaje llano (frases en textos.py: la probabilidad se compara con el azar, 33 %)
+    ia/              ia_view (escáner a la izquierda + pestañas Volatilidad · Proyección de precio · Evaluación · Registro vs. realidad),
+                     ia_controller, senal_view (pestaña Volatilidad), proyeccion_view, evaluacion_view, registro_view, textos.py (textos y
+                     reglas de presentación, puro), graficos.py (abanico de Monte Carlo, error por periodo contra las dos bases y predicho vs. real; matplotlib puro). La volatilidad NO usa verde/rojo (no es bueno ni malo): solo los aciertos/fallos del registro
     operar/          operar_view (ticket a la derecha + gráfico + pestañas), operar_controller, proteccion_dialog (SL/TP), pantallas.py
     admin/           usuarios, activos, ingesta, modelos_ia (entrenar, versiones, comparar algoritmos): cada uno con su vista y su controlador;
                      activo_dialogs.py = ventanas emergentes de Activos (agregar y editar el nombre)
@@ -558,6 +560,7 @@ lo que hace: `autenticar` verifica y no inicia sesión; el controlador es quien 
 56. **IA, fase 4 (admin).** Sección «Modelos de IA» (solo admin): estado del ciclo (última predicción, de hoy, pendientes, evaluadas), «Entrenar y evaluar» (confirma; corre en hilo; avisa si el modelo quedó activo o no), tabla de versiones, «Activar esta versión» (solo archivadas que superan la base) y «Comparar algoritmos» (LightGBM vs Random forest con el mismo walk-forward y los mismos datos, más la base; no guarda nada). Servicios: `ModeloIAService.comparar`, `PrediccionService.estado_ciclo`. Si el admin sale de la pantalla mientras entrena, el entrenamiento termina y se guarda igual.
 57. **IA: un solo horizonte, a 1 día.** Se quitaron los horizontes de 3, 5 y 10 días: los modelos no superaron a la base (z entre −0,5 y 0,6 en todas las versiones) y para probar predicciones eran demasiado largos. `HORIZONTES = (HORIZONTE,) = (1,)`; no hay selector de horizonte en «Predicciones IA» ni en «Modelos de IA». Los servicios (`entrenar`, `comparar`, `resumen`, `detalle`) siguen recibiendo `horizonte` y validan contra `HORIZONTES`, y las columnas `horizonte_dias` de la base no cambian: así, más adelante, se puede agregar otro plazo (por ejemplo por hora) sin rehacer el motor. La pestaña «Proyección» mantiene su ventana de 5 días (`_DIAS_PROYECCION`): es la dispersión de precio de Monte Carlo, no una predicción. Los indicadores `ret_3d`, `ret_5d` y `ret_10d` son retornos pasados y siguen siendo features. Quedó `database/ia_quitar_horizontes.sql` para borrar de la base lo que dejaron los horizontes anteriores.
 52. **El menú lateral del shell se queda como está.** Se evaluó una barra de íconos y pestañas arriba (no caben los módulos futuros ni el menú de admin con textos largos); se descartó. Si más adelante se quiere ahorrar ancho, la opción acordada como válida es una barra lateral **ocultable** (mismo patrón ◀/▶ de 5.1).
+58. **IA: de dirección a VOLATILIDAD (noviembre de 2026).** La dirección (AUC ≈ 0,61, acierto ≈ base, z < 1,65 en todas las pruebas) se apartó a `experimental/direccion/` (código y pruebas intactos, sin ejecutarse; sus tablas `predicciones_direccion` y `explicaciones_prediccion` siguen en la base sin tocar). La app real predice el **rango del próximo día**: `(máximo − mínimo) / cierre` de la vela diaria, como fracción (0,023 = 2,3 %), solo diario y los 30 activos. Objetivo en logaritmo: `ln(rango_{i+1}) − ln(media de los últimos 20 rangos hasta i)` («cuántas veces lo normal»); la predicción es `exp(ŷ + ln media20)`. 22 features en Python puro (`analisis/volatilidad.py`, `ARRANQUE = 120`), sin mirar el futuro. LightGBM regresor (`ia/volatilidad.py`; en pruebas se inyecta `HistGradientBoostingRegressor`). Validación walk-forward de 4 tramos con purga contra DOS bases: «repetir el rango de hoy» y «promedio de 20 días»; z pareado por día (promedio de los activos de cada día) corregido por autocorrelación AR(1); el modelo es ACTIVO solo si el **menor** de los dos z ≥ 1,65, si no queda ARCHIVADO. Salida por activo: rango en %, intervalo de ~80 % (con el sigma del error de validación), **nivel** baja/normal/alta (≤ percentil 25 / ≥ 75 de los últimos 90 rangos del mismo activo; los umbrales se guardan con la predicción y con ellos se evalúa) y los factores (`pred_contrib`). Reutiliza `modelos_ia` (`tipo='volatilidad'`, nombre `volatilidad_1d`, `horizonte_dias = 1`) y `entrenamientos_modelo`, más UNA tabla nueva `predicciones_volatilidad` (`database/ia_volatilidad.sql`; los factores van en una columna JSON). Evaluación en vivo: cuando existe la vela objetivo se guarda `rango_real`, `nivel_real` y `acierto_nivel`; el registro compara el error real del modelo con el de «repetir hoy». Código: `domain/reglas/volatilidad.py`, `ia/volatilidad.py`, `services/modelo_volatilidad_service.py` (`entrenar(actor)`, `comparar(actor)`, `listar`, `activar`), `services/prediccion_volatilidad_service.py` (`generar_predicciones`, `evaluar_vencidas`, `resumen`, `detalle`, `estado_ciclo`, `proyectar`), `repositories/prediccion_volatilidad_repository.py`; `ModeloIARepository.listar/listar_activos` reciben `tipo`. En `Servicios`: `volatilidad` y `modelo_volatilidad`. El modelo de dirección que haya en `modelos_ia` no lo toca nada (otro `tipo`). Las rutas `ia` y `admin_modelos_ia` se conservan con pantallas nuevas. **Sin verificar con datos reales:** si el modelo supera a las dos bases en los 30 activos, la forma de `pred_contrib` de LightGBM regresor (se probó con un booster simulado), el SQL en PostgreSQL 9.3 y toda la interfaz.
 
 ---
 
@@ -575,6 +578,7 @@ tiene hoy estas tablas y se irá ajustando por módulo (hay un volcado en `datab
   (`id_activo`, `precio`, `cierre_anterior`, `variacion_pct_dia`, `maximo_dia`, `minimo_dia`, `volumen_dia`,
   `actualizado_en`). Más los tipos `tipo_activo` e `intervalo_vela`. Son más chicas que las de la guía a propósito
   (sin sector, logo, capitalización, etc.).
+- **Las de IA:** `database/ia.sql` (`modelos_ia`, `entrenamientos_modelo`, y las de dirección, hoy sin uso) y `database/ia_volatilidad.sql` (tipo `nivel_volatilidad` y tabla `predicciones_volatilidad`: `id_activo`, `id_modelo`, `generada_en`, `fecha_objetivo`, `precio_referencia`, `rango_predicho`, `rango_bajo`, `rango_alto`, `rango_hoy`, `rango_normal`, `umbral_bajo`, `umbral_alto`, `nivel`, `factores` JSON, y al evaluar `rango_real`, `nivel_real`, `acierto_nivel`, `evaluada_en`; una predicción por día UTC por activo y modelo). Orden: `ia.sql`, luego `ia_volatilidad.sql`.
 - **Las de Operar, definidas de verdad en `database/operar.sql` y `operar_fase2.sql`**, más chicas que las de la guía:
   - `ordenes`: `id_orden`, `id_cuenta`, `id_activo`, `lado`, `tipo`, `estado`, `cantidad`, `precio_promedio`,
     `comision_total`, `creada_en`, `ejecutada_en` y (fase 2) `precio_limite`, `stop_loss`, `take_profit` (niveles que
@@ -615,6 +619,7 @@ PostgreSQL 9.3, claves `id_<entidad>` y los tipos de abajo.
 - **Controladores:** `VistaFalsa` (formularios), `VistaPanelFalsa` (secciones; anota lo que le ordenan —incluidos `mostrar_patrimonio` y `limpiar_cantidad`—, y cada diálogo de error que se habría abierto en `errores_mostrados`), `NavegadorFalso`, `ServicioFalso`, `ServicioGenerico` (responde cualquier método con lo que se le prepare) y una `Session()` propia por prueba. `ejecutar_en_hilo` se reemplaza con `mock.patch(...)` en `simultradia.iu.base.form_controller` o `simultradia.iu.base.panel_controller` (en el acto, o diferido con `EjecutorDiferido`). `tests/iu/test_panel_controller.py` prueba el aviso único de los refrescos periódicos. `tests/iu/test_operar_lado.py` prueba el patrimonio y la cantidad al cambiar de lado; `tests/iu/test_lista_nombre.py`, el orden por Nombre.
 - **Navegador:** `VentanaFalsa`, `PantallaFalsa`, `ShellFalso`.
 - **Dominio, análisis, formato y gráfico:** puro Python; las reglas de operar en `tests/domain/`; el dibujo (`candle_render`) se prueba con una `Figure` de matplotlib y `savefig`; las marcas del eje horizontal (`indices_eje_x`, `etiquetas_eje_x`) en `tests/iu/test_candle_etiquetas.py`. Las pruebas del cliente de Yahoo usan tablas de pandas armadas a mano (se saltan si pandas no está).
+- **IA:** `tests/ia/vol_fakes.py` (series sintéticas con volatilidad anticipable o al azar, repositorios en memoria, regresor de scikit-learn), `tests/ia/test_volatilidad.py`, `tests/analisis/test_volatilidad.py`, `tests/domain/test_reglas_volatilidad.py`, `tests/services/test_volatilidad_services.py`, `tests/iu/test_ia_controller.py`, `tests/iu/test_modelos_volatilidad_controller.py`, `tests/iu/test_ia_textos.py`, `tests/iu/test_ia_graficos.py`. Las pruebas de la dirección viven en `tests/experimental/` y deben seguir pasando.
 - **Las vistas de tkinter NO se prueban** (nadie las ejecuta fuera de la app): un error de armado solo aparece al abrir la pantalla.
 - **Entorno de Claude:** sin tkinter, ttkbootstrap, psycopg2, ccxt, yfinance ni red. Se verifica con módulos simulados (stubs) en una carpeta temporal y `PYTHONPATH`. Lo visual y las conexiones reales solo los puede comprobar el usuario.
 

@@ -15,7 +15,7 @@ class ModeloIA:
     horizonte_dias: Optional[int] = None
     estado: EstadoModelo = EstadoModelo.ENTRENANDO
     parametros: Dict = field(default_factory=dict)
-    metricas: Dict = field(default_factory=dict)  # la evaluación walk-forward (ia/serializacion.py)
+    metricas: Dict = field(default_factory=dict)  # la evaluación walk-forward (ia/volatilidad_serializacion.py)
     ruta_artefacto: Optional[str] = None
     id_modelo: Optional[int] = None
     entrenado_en: Optional[datetime] = None

@@ -1,32 +1,36 @@
-"""Predicciones de dirección: generarlas cada día, evaluarlas al vencer y leerlas para las pantallas.
+"""Predicciones de volatilidad: generarlas cada día, evaluarlas al vencer y leerlas para las pantallas.
 
-- GENERAR (worker): para cada modelo ACTIVO (uno por horizonte) y cada activo habilitado, UNA predicción por
-  día con la última vela diaria CERRADA. Se guardan el precio de referencia (su cierre), la fecha en que se
-  podrá evaluar y los factores que más pesaron. Un activo sin velas al día se omite (no se predice a ciegas).
-- EVALUAR (worker): al vencer, mira qué pasó `horizonte` velas después de la de referencia y con el MISMO
-  umbral del entrenamiento decide la dirección real y si se acertó. Espera a que exista esa vela.
-- LEER (pantallas): el escáner, el historial, los factores y el acierto REAL en vivo.
+- GENERAR (worker): para el modelo ACTIVO y cada activo habilitado, UNA predicción por día con la última vela
+  diaria CERRADA: el rango esperado de mañana, un intervalo de ~80 %, el nivel (baja/normal/alta) y los factores
+  que más pesaron. También se guardan lo de hoy, lo «normal» y los umbrales, para evaluar con las mismas
+  reglas. Un activo sin velas al día se omite (no se predice a ciegas).
+- EVALUAR (worker): cuando existe la vela objetivo, mira su rango REAL, su nivel real y si el nivel se acertó.
+- LEER (pantallas): el escáner, el historial, los factores y los resultados REALES en vivo.
 
-Nada de aquí llama a APIs externas ni entrena: el entrenamiento está en `ModeloIAService`.
+Nada de aquí llama a APIs externas ni entrena: el entrenamiento está en `ModeloVolatilidadService`.
 """
 import logging
+import math
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Callable, List, Optional, Tuple
 
 from simultradia.analisis.montecarlo import Proyeccion, proyectar as proyectar_precio
-from simultradia.analisis.features import NOMBRES_FEATURES, calcular_features, etiquetar, velas_cerradas
+from simultradia.analisis.velas import velas_cerradas
+from simultradia.analisis.volatilidad import INDICE_NORMAL, NOMBRES_FEATURES, calcular_features, rango_de, rangos
 from simultradia.core.exceptions import ErrorOperacionInvalida
 from simultradia.domain.entities.modelo_ia_entity import ModeloIA
-from simultradia.domain.entities.prediccion_entity import EstadoCiclo, PrecisionVivo, Prediccion, SenalActivo
+from simultradia.domain.entities.prediccion_volatilidad_entity import (
+    EstadoCiclo, Factor, PrecisionVivo, PrediccionVolatilidad, SenalVolatilidad)
 from simultradia.domain.entities.usuario_entity import Usuario
-from simultradia.domain.enums import IntervaloVela, TipoActivo
-from simultradia.domain.reglas.prediccion import ALCISTA, BAJISTA, DIRECCIONES, LATERAL, fecha_objetivo
-from simultradia.ia.entrenamiento import explicar, predecir
+from simultradia.domain.enums import IntervaloVela, TipoActivo, TipoModeloIA
+from simultradia.domain.reglas.volatilidad import (
+    VENTANA_NIVEL, fecha_objetivo, intervalo_80, nivel_de, umbrales_de)
+from simultradia.ia.volatilidad import explicar, predecir
 from simultradia.services.permisos import exigir_admin
 
 _log = logging.getLogger(__name__)
-_VELAS_A_LEER = 500                       # de sobra para que EMA, RSI y ATR se asienten igual que al entrenar
+_VELAS_A_LEER = 500                       # de sobra para las medias de hasta 120 velas
 _ANTIGUEDAD_MAXIMA_CRIPTO = timedelta(days=2)   # la última vela cerrada debe ser la de ayer
 _ANTIGUEDAD_MAXIMA = timedelta(days=5)          # lo demás: cubre fin de semana y algún feriado
 _FACTORES = 5
@@ -41,21 +45,19 @@ class ResultadoGeneracion:
 
 
 @dataclass(frozen=True)
-class ResumenIA:
-    horizonte: int
-    modelo: Optional[ModeloIA]            # None = ese horizonte no tiene modelo activo
-    senales: List[SenalActivo]            # de mayor a menor confianza
+class ResumenVolatilidad:
+    modelo: Optional[ModeloIA]            # None = no hay modelo activo
+    senales: List[SenalVolatilidad]       # de más a menos agitado esperado (vs lo normal)
     precision: PrecisionVivo
 
 
 @dataclass(frozen=True)
-class DetalleActivoIA:
-    vigente: Optional[Prediccion]         # la predicción de hoy (None si no hay)
-    factores: List[Tuple[str, float, Optional[float]]]
-    historial: List[Prediccion]           # de la más nueva a la más vieja
+class DetalleActivoVolatilidad:
+    vigente: Optional[PrediccionVolatilidad]   # la predicción de hoy (None si no hay)
+    historial: List[PrediccionVolatilidad]     # de la más nueva a la más vieja
 
 
-class PrediccionService:
+class PrediccionVolatilidadService:
     def __init__(self, db, activo_repository, precio_repository, modelo_repository, prediccion_repository,
                  almacen, ahora: Callable[[], datetime] = lambda: datetime.now(timezone.utc)):
         self._db = db
@@ -70,7 +72,7 @@ class PrediccionService:
     def generar_predicciones(self) -> ResultadoGeneracion:
         ahora = self._ahora()
         with self._db.obtener_conexion() as conn:
-            modelos = self._modelos.listar_activos(conn)
+            modelos = self._modelos.listar_activos(conn, TipoModeloIA.VOLATILIDAD)
             if not modelos:
                 return ResultadoGeneracion()
             activos = self._activos.listar_activos(conn)
@@ -80,7 +82,7 @@ class PrediccionService:
                       for m in modelos}
 
         cargados = self._cargar_modelos(modelos)
-        nuevas: List[Tuple[Prediccion, List[Tuple[str, float, Optional[float]]]]] = []
+        nuevas: List[PrediccionVolatilidad] = []
         omitidas = 0
         for activo in activos:
             cerradas = velas_cerradas(velas[activo.id_activo], ahora)
@@ -88,26 +90,26 @@ class PrediccionService:
                 omitidas += 1
                 continue
             fila = calcular_features(cerradas)[-1]
-            if fila is None:
+            umbrales = umbrales_de(rangos(cerradas)[-VENTANA_NIVEL:])
+            if fila is None or umbrales is None:
                 omitidas += 1
                 continue
             for modelo, entrenado in cargados:
                 if activo.id_activo in hechas[modelo.id_modelo]:
                     continue
                 try:
-                    nuevas.append(self._predecir(activo, modelo, entrenado, cerradas[-1], fila, ahora))
+                    nuevas.append(self._predecir(activo, modelo, entrenado, cerradas[-1], fila, umbrales, ahora))
                 except Exception:       # un activo o un modelo con problemas no frena a los demás
                     _log.exception("No se pudo predecir %s con el modelo %s", activo.ticker, modelo.nombre)
 
         if nuevas:
             with self._db.obtener_conexion() as conn:
-                for prediccion, factores in nuevas:
+                for prediccion in nuevas:
                     self._predicciones.insertar(conn, prediccion)
-                    self._predicciones.insertar_explicaciones(conn, prediccion.id_prediccion, factores)
         return ResultadoGeneracion(generadas=len(nuevas), omitidas=omitidas)
 
     def evaluar_vencidas(self) -> int:
-        """Completa las predicciones cuya fecha objetivo ya pasó. Devuelve cuántas evaluó."""
+        """Completa las predicciones cuya vela objetivo ya cerró. Devuelve cuántas evaluó."""
         ahora = self._ahora()
         with self._db.obtener_conexion() as conn:
             vencidas = self._predicciones.vencidas(conn, ahora)
@@ -123,39 +125,35 @@ class PrediccionService:
             al_predecir = velas_cerradas(todas, p.generada_en)
             if not al_predecir:
                 continue
-            referencia = len(al_predecir) - 1                  # la vela con la que se predijo
-            if referencia + p.horizonte_dias >= len(cerradas):
-                continue                                       # la vela objetivo todavía no existe
-            clase = etiquetar([float(v.cierre) for v in cerradas], p.horizonte_dias)[referencia]
-            if clase is None:
-                continue
-            real = DIRECCIONES[clase]
-            resultados.append((p.id_prediccion, cerradas[referencia + p.horizonte_dias].cierre, real,
-                               real == p.direccion))
+            siguiente = len(al_predecir)                       # la vela que seguía a la de referencia
+            if siguiente >= len(cerradas):
+                continue                                       # esa vela todavía no cerró
+            real = rango_de(cerradas[siguiente])
+            nivel_real = nivel_de(real, p.umbral_bajo, p.umbral_alto)
+            resultados.append((p.id_prediccion, real, nivel_real, nivel_real == p.nivel))
         if resultados:
             with self._db.obtener_conexion() as conn:
-                for id_prediccion, precio, real, acierto in resultados:
-                    self._predicciones.registrar_resultado(conn, id_prediccion, precio, real, acierto, ahora)
+                for id_prediccion, real, nivel_real, acierto in resultados:
+                    self._predicciones.registrar_resultado(conn, id_prediccion, real, nivel_real, acierto, ahora)
         return len(resultados)
 
     # ------------------------------------------------------------ lecturas de las pantallas
-    def resumen(self, horizonte: int) -> "ResumenIA":
-        """Lo que la pantalla necesita de un horizonte: su modelo activo, el escáner y el acierto real."""
+    def resumen(self) -> ResumenVolatilidad:
+        """Lo que la pantalla necesita: el modelo activo, el escáner y los resultados reales."""
         ahora = self._ahora()
         with self._db.obtener_conexion() as conn:
-            modelo = next((m for m in self._modelos.listar_activos(conn) if m.horizonte_dias == horizonte), None)
-            senales = self._predicciones.ultimas_por_activo(conn, horizonte) if modelo else []
-            precision = self._predicciones.precision(conn, horizonte, ahora)
-        return ResumenIA(horizonte, modelo, sorted(senales, key=lambda s: -s.prediccion.confianza), precision)
+            modelo = next(iter(self._modelos.listar_activos(conn, TipoModeloIA.VOLATILIDAD)), None)
+            senales = self._predicciones.ultimas_por_activo(conn) if modelo else []
+            precision = self._predicciones.precision(conn, ahora)
+        return ResumenVolatilidad(modelo, sorted(senales, key=lambda s: -s.prediccion.veces_lo_normal), precision)
 
-    def detalle(self, id_activo: int, horizonte: int) -> "DetalleActivoIA":
-        """Los factores de la predicción vigente de un activo y su historial (lo predicho contra lo ocurrido)."""
+    def detalle(self, id_activo: int) -> DetalleActivoVolatilidad:
+        """La predicción vigente de un activo y su historial (lo predicho contra lo ocurrido)."""
         with self._db.obtener_conexion() as conn:
-            vigente = next((s.prediccion for s in self._predicciones.ultimas_por_activo(conn, horizonte)
+            vigente = next((s.prediccion for s in self._predicciones.ultimas_por_activo(conn)
                             if s.prediccion.id_activo == id_activo), None)
-            factores = self._predicciones.explicaciones(conn, vigente.id_prediccion) if vigente else []
-            historial = self._predicciones.historial(conn, id_activo, horizonte, _HISTORIAL)
-        return DetalleActivoIA(vigente, factores, historial)
+            historial = self._predicciones.historial(conn, id_activo, _HISTORIAL)
+        return DetalleActivoVolatilidad(vigente, historial)
 
     def estado_ciclo(self, actor: Usuario) -> EstadoCiclo:
         """Cómo va el ciclo de predicciones (administración)."""
@@ -184,6 +182,10 @@ class PrediccionService:
     def _cargar_modelos(self, modelos: List[ModeloIA]) -> List[Tuple[ModeloIA, object]]:
         cargados = []
         for modelo in modelos:
+            if list(modelo.parametros.get("features", [])) != list(NOMBRES_FEATURES):
+                _log.warning("El modelo %s %s se entrenó con otras features: se omite. Hay que reentrenarlo.",
+                             modelo.nombre, modelo.version)
+                continue
             try:
                 cargados.append((modelo, self._almacen.cargar(modelo.ruta_artefacto)))
             except Exception:
@@ -191,21 +193,21 @@ class PrediccionService:
         return cargados
 
     @staticmethod
-    def _predecir(activo, modelo: ModeloIA, entrenado, vela, fila: List[float],
-                  ahora: datetime) -> Tuple[Prediccion, List[Tuple[str, float, Optional[float]]]]:
-        alcista, lateral, bajista = predecir(entrenado, fila)
-        por_clase = {BAJISTA: bajista, LATERAL: lateral, ALCISTA: alcista}
-        clase = max(por_clase, key=por_clase.get)
-        prediccion = Prediccion(
-            id_activo=activo.id_activo, id_modelo=modelo.id_modelo, horizonte_dias=modelo.horizonte_dias,
-            generada_en=ahora, fecha_objetivo=fecha_objetivo(vela.momento, modelo.horizonte_dias, activo.tipo),
-            direccion=DIRECCIONES[clase], prob_alcista=round(alcista, 4), prob_bajista=round(bajista, 4),
-            prob_lateral=round(lateral, 4), confianza=round(por_clase[clase], 4),
-            precio_referencia=vela.cierre)
+    def _predecir(activo, modelo: ModeloIA, entrenado, vela, fila: List[float], umbrales,
+                  ahora: datetime) -> PrediccionVolatilidad:
+        rango = predecir(entrenado, fila)
+        sigma = float(modelo.metricas.get("sigma", 0.0))
+        bajo, alto = intervalo_80(rango, sigma)
         try:
-            aportes = explicar(entrenado, fila, clase, _FACTORES)
+            aportes = explicar(entrenado, fila, _FACTORES)
         except Exception:               # los factores son un extra: sin ellos la predicción igual vale
             _log.warning("No se pudieron calcular los factores de %s", activo.ticker, exc_info=True)
             aportes = []
-        factores = [(nombre, aporte, fila[NOMBRES_FEATURES.index(nombre)]) for nombre, aporte in aportes]
-        return prediccion, factores
+        factores: List[Factor] = [(nombre, aporte, fila[NOMBRES_FEATURES.index(nombre)]) for nombre, aporte in aportes]
+        return PrediccionVolatilidad(
+            id_activo=activo.id_activo, id_modelo=modelo.id_modelo, generada_en=ahora,
+            fecha_objetivo=fecha_objetivo(vela.momento, activo.tipo), precio_referencia=vela.cierre,
+            rango_predicho=round(rango, 6), rango_bajo=round(bajo, 6), rango_alto=round(alto, 6),
+            rango_hoy=round(math.exp(fila[0]), 6), rango_normal=round(math.exp(fila[INDICE_NORMAL]), 6),
+            umbral_bajo=round(umbrales[0], 6), umbral_alto=round(umbrales[1], 6),
+            nivel=nivel_de(rango, umbrales[0], umbrales[1]), factores=factores)

@@ -1,73 +1,65 @@
-"""Pruebas de los textos de la pantalla de IA."""
+"""Pruebas de los textos de la pantalla de volatilidad (Python puro)."""
 import unittest
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
-from simultradia.domain.entities.prediccion_entity import Prediccion
-from simultradia.domain.enums import DireccionPrediccion as D
+from simultradia.domain.entities.prediccion_volatilidad_entity import PrediccionVolatilidad
+from simultradia.domain.enums import NivelVolatilidad as N
+from simultradia.analisis.volatilidad import NOMBRES_FEATURES
 from simultradia.iu.ia import textos
 
+_AHORA = datetime(2026, 11, 18, tzinfo=timezone.utc)
 
-def _p(acierto=None):
-    return Prediccion(1, 1, 5, datetime(2026, 11, 18, tzinfo=timezone.utc), datetime(2026, 11, 25, tzinfo=timezone.utc),
-                      D.ALCISTA, 0.5, 0.2, 0.3, 0.5, Decimal(100), acierto=acierto)
+
+def _p(**cambios):
+    datos = dict(id_activo=1, id_modelo=1, generada_en=_AHORA, fecha_objetivo=_AHORA, precio_referencia=Decimal(100),
+                 rango_predicho=0.023, rango_bajo=0.016, rango_alto=0.033, rango_hoy=0.03, rango_normal=0.02,
+                 umbral_bajo=0.012, umbral_alto=0.026, nivel=N.NORMAL)
+    datos.update(cambios)
+    return PrediccionVolatilidad(**datos)
 
 
 class PruebasTextos(unittest.TestCase):
-    def test_porcentajes_y_numeros_en_espanol(self):
-        self.assertEqual(textos.pct(0.543), "54 %")
-        self.assertEqual(textos.pct(0.5432, 1), "54,3 %")
-        self.assertEqual(textos.numero(2.4149), "2,41")
-        self.assertEqual(textos.numero(3.14, 1, con_signo=True), "+3,1")
+    def test_numeros_con_coma_decimal(self):
+        self.assertEqual(textos.pct(0.543), "54 %")
+        self.assertEqual(textos.rango(0.023), "2,3 %")
+        self.assertEqual(textos.numero(1.5, 2, con_signo=True), "+1,50")
+        self.assertEqual(textos.veces(1.44), "1,4× lo normal")
 
-    def test_confianza_con_su_nivel(self):
-        self.assertEqual(textos.confianza(0.40), "Baja · 40 %")
-        self.assertTrue(textos.confianza(0.54).startswith("Media"))
-        self.assertTrue(textos.confianza(0.72).startswith("Alta"))
+    def test_error_en_porcentaje_del_rango(self):
+        self.assertEqual(textos.error_pct(0.0), "±0 %")
+        self.assertEqual(textos.error_pct(0.405465), "±50 %")
 
-    def test_color_de_fila_segun_direccion(self):
-        self.assertEqual(textos.etiqueta_fila(D.ALCISTA), "alza")
-        self.assertEqual(textos.etiqueta_fila(D.BAJISTA), "baja")
-        self.assertEqual(textos.etiqueta_fila(D.LATERAL), "")
-
-    def test_resultado_de_una_prediccion(self):
-        self.assertEqual((textos.resultado(_p()), textos.etiqueta_resultado(_p())), ("Pendiente", ""))
-        self.assertEqual((textos.resultado(_p(True)), textos.etiqueta_resultado(_p(True))), ("Acertó", "alza"))
-        self.assertEqual((textos.resultado(_p(False)), textos.etiqueta_resultado(_p(False))), ("Falló", "baja"))
-
-    def test_todos_los_factores_tienen_nombre_legible(self):
-        from simultradia.analisis.features import NOMBRES_FEATURES
+    def test_cada_feature_tiene_nombre_legible(self):
         for nombre in NOMBRES_FEATURES:
             self.assertNotEqual(textos.factor(nombre), nombre)
-        self.assertEqual(textos.factor("otro"), "otro")
+        self.assertEqual(textos.factor("desconocida"), "desconocida")
 
-    def test_periodo_de_un_tramo(self):
-        from datetime import date
-        self.assertEqual(textos.periodo(date(2019, 3, 5).toordinal(), date(2020, 8, 30).toordinal()),
-                         "mar 2019 – ago 2020")
-        self.assertEqual(textos.periodo(date(2019, 3, 5).toordinal(), date(2019, 3, 30).toordinal()), "mar 2019")
+    def test_niveles_y_frases(self):
+        self.assertEqual(textos.nivel(N.ALTA), "Alta")
+        for n in N:
+            self.assertTrue(textos.frase_nivel(n))
 
-    def test_frases_llanas(self):
-        self.assertIn("poco", textos.frase_direccion(D.LATERAL, 1))
-        self.assertIn("1 día", textos.frase_direccion(D.ALCISTA, 1))
-        self.assertIn("2 días", textos.frase_direccion(D.BAJISTA, 2))
-        self.assertIn("33\xa0%", textos.frase_confianza(0.59))
-        self.assertEqual(textos.nombre_modelo(1, "v2"), "Modelo a 1 día · versión 2")
+    def test_resultado_del_registro(self):
+        self.assertEqual(textos.resultado(_p()), "Pendiente")
+        self.assertEqual(textos.etiqueta_resultado(_p()), "")
+        self.assertEqual(textos.resultado(_p(acierto_nivel=True)), "Acertó")
+        self.assertEqual(textos.etiqueta_resultado(_p(acierto_nivel=False)), "baja")
 
-    def test_lectura_de_la_calibracion(self):
-        from simultradia.ia.entrenamiento import BinCalibracion
-        sube = [BinCalibracion("< 0.4", 100, 0.36, 0.37), BinCalibracion("≥ 0.7", 100, 0.8, 0.75)]
-        self.assertTrue(textos.lectura_calibracion(sube).startswith("Sí"))
-        self.assertTrue(textos.lectura_calibracion(sube[::-1]).startswith("No"))
-        self.assertIn("suficientes", textos.lectura_calibracion([BinCalibracion("< 0.4", 5, 0.4, 0.4)]))
+    def test_periodo(self):
+        self.assertEqual(textos.periodo(date(2019, 3, 1).toordinal(), date(2020, 8, 1).toordinal()), "mar 2019 – ago 2020")
 
-    def test_lectura_de_la_validacion(self):
-        from simultradia.ia.entrenamiento import Evaluacion
-        ev = Evaluacion(5, 100, 50, 10.0, 0.435, 0.413, 2.06, None)
-        self.assertIn("no ser casualidad", textos.lectura_validacion(ev))
-        ev = Evaluacion(5, 100, 50, 10.0, 0.415, 0.413, 0.2, None)
-        self.assertIn("casualidad", textos.lectura_validacion(ev))
-        self.assertIn("demasiado pequeña", textos.lectura_validacion(ev))
+    def test_las_frases_dicen_los_numeros_de_la_prediccion(self):
+        p = _p()
+        self.assertIn("1,6 %", textos.frase_intervalo(p))
+        self.assertIn("3,3 %", textos.frase_intervalo(p))
+        self.assertIn("1,1× lo normal", textos.frase_normal(p))
+
+    def test_entidad_error_y_veces(self):
+        p = _p(rango_real=0.023)
+        self.assertAlmostEqual(p.error, 0.0)
+        self.assertTrue(p.dentro_del_intervalo)
+        self.assertAlmostEqual(_p().veces_lo_normal, 1.15)
 
 
 if __name__ == "__main__":

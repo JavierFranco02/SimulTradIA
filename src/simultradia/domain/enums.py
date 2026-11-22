@@ -54,6 +54,13 @@ class DireccionPrediccion(str, Enum):
     BAJISTA = "bajista"
 
 
+class NivelVolatilidad(str, Enum):
+    """Qué tan agitado se espera el día, contra los últimos 90 días del propio activo."""
+    BAJA = "baja"
+    NORMAL = "normal"
+    ALTA = "alta"
+
+
 class TipoModeloIA(str, Enum):
     DIRECCION = "direccion"
     VOLATILIDAD = "volatilidad"

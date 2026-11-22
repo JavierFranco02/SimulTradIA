@@ -30,7 +30,7 @@ def _ingesta(padre, nav):
 
 def _modelos_ia(padre, nav):
     vista = ModelosIAView(padre)
-    ModelosIAController(vista, nav.servicios.modelo_ia, nav.servicios.prediccion, nav.session).cargar()
+    ModelosIAController(vista, nav.servicios.modelo_volatilidad, nav.servicios.volatilidad, nav.session).cargar()
     return vista
 
 

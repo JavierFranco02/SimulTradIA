@@ -1,11 +1,10 @@
-"""Controlador de Administración · Modelos de IA.
+"""Controlador de Administración · Modelos de IA (volatilidad).
 
   - Muestra las versiones y el estado del ciclo (se refresca solo cada pocos segundos).
   - «Entrenar y evaluar» y «Comparar algoritmos» tardan minutos: corren en segundo plano, con los botones quietos,
     y al terminar avisan con un diálogo. Si el administrador sale de la pantalla, el entrenamiento igual termina y se guarda.
-  - «Activar» vuelve a poner activa una versión archivada que supera la base.
+  - «Activar» vuelve a poner activa una versión archivada que supera a las bases.
 """
-from simultradia.domain.reglas.prediccion import HORIZONTE
 from simultradia.iu.base.panel_controller import PanelController
 from simultradia.iu.ia import textos
 
@@ -15,16 +14,17 @@ _CADA_MS = 10000
 def texto_resultado(resultado) -> str:
     """Qué pasó con un entrenamiento, en una frase."""
     m, ev = resultado.modelo, resultado.evaluacion
-    base = "%s %s: %s (z = %s)." % (m.nombre, m.version, ev.veredicto.lower(), textos.numero(ev.z))
+    base = "%s %s: %s (z = %s; error %s)." % (m.nombre, m.version, ev.veredicto.lower(), textos.numero(ev.z),
+                                              textos.error_pct(ev.error))
     if resultado.activado:
         return base + " Quedó activo."
     return base + " No se activó: sigue el modelo anterior, si había."
 
 
 class ModelosIAController(PanelController):
-    def __init__(self, vista, modelo_ia_service, prediccion_service, session):
+    def __init__(self, vista, modelo_service, prediccion_service, session):
         super().__init__(vista)
-        self._modelos = modelo_ia_service
+        self._modelos = modelo_service
         self._predicciones = prediccion_service
         self._session = session
         vista.vincular_acciones(al_entrenar=self.entrenar, al_comparar=self.comparar, al_activar=self.activar)
@@ -39,7 +39,7 @@ class ModelosIAController(PanelController):
             return
         actor = self._session.usuario
         self._vista.establecer_ocupado(True, "entrenar")
-        self._ejecutar(lambda: self._modelos.entrenar(actor, HORIZONTE),
+        self._ejecutar(lambda: self._modelos.entrenar(actor),
                        al_terminar=self._al_entrenar, al_fallar=self._al_fallar_accion)
 
     def comparar(self) -> None:
@@ -47,7 +47,7 @@ class ModelosIAController(PanelController):
             return
         actor = self._session.usuario
         self._vista.establecer_ocupado(True, "comparar")
-        self._ejecutar(lambda: self._modelos.comparar(actor, HORIZONTE),
+        self._ejecutar(lambda: self._modelos.comparar(actor),
                        al_terminar=self._al_comparar,
                        al_fallar=self._al_fallar_accion)
 

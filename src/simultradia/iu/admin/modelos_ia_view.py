@@ -10,9 +10,9 @@ from typing import Callable, Dict, List, Optional
 import ttkbootstrap as ttk
 
 from simultradia.domain.entities.modelo_ia_entity import ModeloIA
-from simultradia.domain.entities.prediccion_entity import EstadoCiclo
+from simultradia.domain.entities.prediccion_volatilidad_entity import EstadoCiclo
 from simultradia.domain.enums import EstadoModelo
-from simultradia.ia.serializacion import desde_dict
+from simultradia.ia.volatilidad_serializacion import desde_dict
 from simultradia.iu.base.panel_view import PanelView
 from simultradia.iu.components import ActionButton, DataTable
 from simultradia.iu.formato import fecha_hora, hace
@@ -26,23 +26,23 @@ _COLUMNAS_VERSIONES = (
     ("modelo", "Modelo", 130, "w"),
     ("version", "Versión", 70, "center"),
     ("estado", "Estado", 100, "center"),
-    ("acierto", "Acierto", 80, "e"),
-    ("base", "Base", 80, "e"),
+    ("error", "Error", 80, "e"),
+    ("mejora", "vs. hoy", 80, "e"),
     ("z", "z", 70, "e"),
     ("entrenado", "Entrenado", 140, "center"),
 )
 _COLUMNAS_COMPARACION = (
-    ("algoritmo", "Algoritmo", 160, "w"),
-    ("acierto", "Acierto", 90, "e"),
+    ("algoritmo", "Algoritmo", 220, "w"),
+    ("error", "Error", 90, "e"),
+    ("mejora", "vs. hoy", 90, "e"),
     ("z", "z", 80, "e"),
-    ("auc", "AUC", 80, "e"),
     ("veredicto", "Veredicto", 200, "w"),
 )
 
 
 class ModelosIAView(PanelView):
     def __init__(self, parent):
-        super().__init__(parent, "Modelos de IA", "Entrenar, evaluar y activar los modelos que generan las predicciones")
+        super().__init__(parent, "Modelos de IA", "Entrenar, evaluar y activar el modelo de volatilidad que genera las predicciones")
         self._al_entrenar: Optional[Callable[[], None]] = None
         self._al_comparar: Optional[Callable[[], None]] = None
         self._al_activar: Optional[Callable[[int], None]] = None
@@ -63,7 +63,7 @@ class ModelosIAView(PanelView):
             self._valores[clave].grid(row=fila, column=1, sticky="w", pady=2)
         ttk.Label(self, font=Fonts.SMALL, justify="left",
                   text="El proceso «python worker.py» genera la predicción del día y evalúa las vencidas cada hora.\n"
-                       "Un modelo solo se activa si supera a la base en la validación; si no, queda archivado."
+                       "Un modelo solo se activa si supera a las DOS bases (repetir el rango de hoy y el promedio de 20 días); si no, queda archivado."
                   ).pack(anchor="w", pady=(0, Spacing.MD))
 
         # Entrenar.
@@ -92,7 +92,7 @@ class ModelosIAView(PanelView):
         self._comparacion = ttk.Frame(self)
         self._titulo_comparacion = ttk.Label(self._comparacion, text="", font=Fonts.HEADING)
         self._titulo_comparacion.pack(anchor="w", pady=(Spacing.MD, Spacing.SM))
-        self._tabla_comparacion = DataTable(self._comparacion, _COLUMNAS_COMPARACION, alto=4)
+        self._tabla_comparacion = DataTable(self._comparacion, _COLUMNAS_COMPARACION, alto=5)
         self._tabla_comparacion.pack(fill="x")
 
     def vincular_acciones(self, al_entrenar: Callable[[], None], al_comparar: Callable[[], None],
@@ -136,7 +136,8 @@ class ModelosIAView(PanelView):
             ev = desde_dict(m.metricas) if m.metricas else None
             filas.append((str(m.id_modelo),
                           (m.nombre, m.version, _ESTADOS[m.estado],
-                           textos.pct(ev.acierto, 1) if ev else "—", textos.pct(ev.base, 1) if ev else "—",
+                           textos.error_pct(ev.error) if ev else "—",
+                           textos.pct(ev.mejora_hoy, 1) if ev else "—",
                            textos.numero(ev.z) if ev else "—",
                            fecha_hora(m.entrenado_en) if m.entrenado_en else "—"),
                           "alza" if m.estado == EstadoModelo.ACTIVO else "baja" if m.estado == EstadoModelo.FALLIDO else ""))
@@ -146,14 +147,17 @@ class ModelosIAView(PanelView):
         self._actualizar_boton_activar()
 
     def mostrar_comparacion(self, filas) -> None:
-        """`filas`: lista de (algoritmo, Evaluacion). Se agrega, al final, la base (acertar siempre la clase más frecuente)."""
+        """`filas`: lista de (algoritmo, Evaluacion). Se agregan, al final, las dos bases que hay que superar."""
         self._titulo_comparacion.configure(text="Comparación de algoritmos")
-        datos = [(str(i), (nombre, textos.pct(ev.acierto, 1), textos.numero(ev.z),
-                           textos.numero(ev.auc, 3) if ev.auc is not None else "—", ev.veredicto),
+        datos = [(str(i), (nombre, textos.error_pct(ev.error), textos.pct(ev.mejora_hoy, 1),
+                           textos.numero(ev.z), ev.veredicto),
                   "alza" if ev.supera_base else "baja") for i, (nombre, ev) in enumerate(filas)]
         if filas:
-            datos.append((str(len(filas)), ("Base (clase más frecuente)", textos.pct(filas[0][1].base, 1),
+            ev = filas[0][1]
+            datos.append((str(len(filas)), ("Base: repetir el rango de hoy", textos.error_pct(ev.error_hoy),
                                             "—", "—", "Lo mínimo a superar"), ""))
+            datos.append((str(len(filas) + 1), ("Base: promedio de 20 días", textos.error_pct(ev.error_media),
+                                                "—", "—", "Lo mínimo a superar"), ""))
         self._tabla_comparacion.establecer_filas(datos)
         if not self._comparacion.winfo_ismapped():
             self._comparacion.pack(fill="x")
