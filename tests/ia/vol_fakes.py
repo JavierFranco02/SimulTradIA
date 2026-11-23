@@ -117,9 +117,9 @@ class PrediccionRepoFalso:
         self.predicciones.append(p)
         return p.id_prediccion
 
-    def activos_con_prediccion_de_hoy(self, conn, id_modelo, ahora):
-        return {p.id_activo for p in self.predicciones
-                if p.id_modelo == id_modelo and p.generada_en.date() == ahora.date()}
+    def objetivos_pendientes(self, conn, id_modelo):
+        return {(p.id_activo, p.fecha_objetivo) for p in self.predicciones
+                if p.id_modelo == id_modelo and p.rango_real is None}
 
     def vencidas(self, conn, ahora):
         return [p for p in self.predicciones if p.rango_real is None and p.fecha_objetivo <= ahora]

@@ -1,7 +1,7 @@
 """Acceso a "predicciones_volatilidad". Aquí vive el SQL de las predicciones de volatilidad."""
 import json
 from datetime import datetime, timedelta
-from typing import List, Optional, Set
+from typing import List, Optional, Set, Tuple
 
 from simultradia.domain.entities.prediccion_volatilidad_entity import (
     EstadoCiclo, PrecisionVivo, PrediccionVolatilidad, SenalVolatilidad)
@@ -28,14 +28,15 @@ class PrediccionVolatilidadRepository:
             p.id_prediccion = cur.fetchone().id_prediccion
         return p.id_prediccion
 
-    def activos_con_prediccion_de_hoy(self, conn, id_modelo: int, ahora: datetime) -> Set[int]:
-        """Activos que ya tienen la predicción de HOY (día UTC) de este modelo."""
+    def objetivos_pendientes(self, conn, id_modelo: int) -> Set[Tuple[int, datetime]]:
+        """(activo, fecha objetivo) de las predicciones de este modelo que aún no se evaluaron.
+
+        Sirve para no repetir una predicción: la predicción de un activo queda identificada por la vela que
+        la evaluará, no por el día en que se generó (si no, al cambiar el día UTC se volvería a predecir lo mismo)."""
         with conn.cursor() as cur:
-            cur.execute(
-                """SELECT id_activo FROM predicciones_volatilidad
-                   WHERE id_modelo = %s AND (generada_en AT TIME ZONE 'UTC')::date = (%s AT TIME ZONE 'UTC')::date""",
-                (id_modelo, ahora))
-            return {f.id_activo for f in cur.fetchall()}
+            cur.execute("SELECT id_activo, fecha_objetivo FROM predicciones_volatilidad "
+                        "WHERE id_modelo = %s AND rango_real IS NULL", (id_modelo,))
+            return {(f.id_activo, f.fecha_objetivo) for f in cur.fetchall()}
 
     def vencidas(self, conn, ahora: datetime) -> List[PrediccionVolatilidad]:
         with conn.cursor() as cur:

@@ -134,6 +134,23 @@ class PruebasPrediccionVolatilidadService(unittest.TestCase):
         self.reloj[0] = AHORA + timedelta(days=1)
         self.assertEqual(self.servicio.generar_predicciones().generadas, 3)
 
+    def test_no_repite_la_prediccion_de_una_vela_aunque_cambie_el_dia_utc(self):
+        # Un ETF en fin de semana: pasa la medianoche UTC pero no cierra ninguna vela nueva, así que la
+        # predicción pendiente (misma vela objetivo) sigue siendo la vigente y no se genera otra.
+        self._entrenar()
+        self.assertEqual(self.servicio.generar_predicciones().generadas, 3)
+        for p in self.predicciones.predicciones:
+            p.generada_en -= timedelta(days=1)          # como si se hubiera generado el día UTC anterior
+        self.assertEqual(self.servicio.generar_predicciones().generadas, 0)
+        self.assertEqual(len(self.predicciones.predicciones), 3)
+
+    def test_vuelve_a_predecir_cuando_la_anterior_ya_se_evaluo(self):
+        self._entrenar()
+        self.servicio.generar_predicciones()
+        self.reloj[0] = AHORA + timedelta(days=FUTURO)
+        self.assertGreater(self.servicio.evaluar_vencidas(), 0)
+        self.assertGreater(self.servicio.generar_predicciones().generadas, 0)
+
     def test_el_nivel_sale_de_los_umbrales_guardados(self):
         self._entrenar()
         self.servicio.generar_predicciones()

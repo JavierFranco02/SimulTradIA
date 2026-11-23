@@ -81,7 +81,7 @@ class PrediccionVolatilidadService:
             activos = self._activos.listar_activos(conn)
             velas = {a.id_activo: self._precios.buscar_velas(conn, a.id_activo, IntervaloVela.D1, _VELAS_A_LEER)
                      for a in activos}
-            hechas = {m.id_modelo: self._predicciones.activos_con_prediccion_de_hoy(conn, m.id_modelo, ahora)
+            hechas = {m.id_modelo: self._predicciones.objetivos_pendientes(conn, m.id_modelo)
                       for m in modelos}
 
         cargados = self._cargar_modelos(modelos)
@@ -97,12 +97,13 @@ class PrediccionVolatilidadService:
             if fila is None or umbrales is None:
                 omitidas += 1
                 continue
-            if fecha_objetivo(cerradas[-1].momento, activo.tipo) <= ahora:
+            objetivo = fecha_objetivo(cerradas[-1].momento, activo.tipo)
+            if objetivo <= ahora:
                 omitidas += 1                    # la vela objetivo ya habría cerrado: no es una predicción
                 continue
             for modelo, entrenado in cargados:
-                if activo.id_activo in hechas[modelo.id_modelo]:
-                    continue
+                if (activo.id_activo, objetivo) in hechas[modelo.id_modelo]:
+                    continue                     # ya hay una pendiente para esa misma vela objetivo
                 try:
                     nuevas.append(self._predecir(activo, modelo, entrenado, cerradas[-1], fila, umbrales, ahora))
                 except Exception:       # un activo o un modelo con problemas no frena a los demás

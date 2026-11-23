@@ -10,6 +10,8 @@ import math
 from decimal import Decimal
 from typing import List, Optional, Sequence
 
+from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
 from matplotlib.ticker import FuncFormatter
 
 from simultradia.analisis.montecarlo import Proyeccion
@@ -26,6 +28,9 @@ def _estilizar(ejes) -> None:
     for borde in ejes.spines.values():
         borde.set_color(Palette.GRILLA)
     ejes.tick_params(colors=Palette.TEXTO, labelsize=Palette.TAMANO_TEXTO)
+
+
+_BANDA = "#2f5f86"          # el intervalo del 80 % del registro: azul acerado, más vivo que el de la proyección
 
 
 def _vacio(figura, texto: str) -> None:
@@ -99,30 +104,47 @@ def dibujar_tramos(figura, evaluacion: Optional[Evaluacion]) -> None:
                 fontsize=Palette.TAMANO_TEXTO)
 
 
+_DIAS_HISTORIAL = 30           # cuántas predicciones se dibujan como máximo
+_COLUMNAS_MINIMAS = 7          # el eje tiene lugar para al menos 7 columnas: el grosor de una barra no depende de cuántas haya
+_ANCHO_BARRA = 0.75            # en columnas (1 = el espacio completo de una columna)
+
+
 def dibujar_historial(figura, historial: Sequence[PrediccionVolatilidad]) -> None:
-    """Rango predicho (línea y banda del 80 %) contra el rango real (puntos), de la más vieja a la más nueva."""
+    """Una columna por predicción, de la más vieja a la más nueva: la banda del intervalo del ~80 %, una marca con el
+    rango predicho y, si ya se evaluó, un punto con el rango real (con borde naranja si cayó fuera de la banda).
+    Una predicción pendiente muestra la banda y la marca, sin punto. Sirve desde la primera predicción."""
     figura.clear()
     figura.set_facecolor(Palette.FONDO)
     if not historial:
         _vacio(figura, "Sin predicciones todavía.")
         return
-    orden: List[PrediccionVolatilidad] = sorted(historial, key=lambda p: p.generada_en)
+    orden: List[PrediccionVolatilidad] = sorted(historial, key=lambda p: p.generada_en)[-_DIAS_HISTORIAL:]
     ejes = figura.add_subplot(1, 1, 1)
-    figura.subplots_adjust(left=0.07, right=0.98, top=0.88, bottom=0.14)
+    figura.subplots_adjust(left=0.07, right=0.98, top=0.86, bottom=0.14)
     _estilizar(ejes)
-    xs = list(range(len(orden)))
-    ejes.fill_between(xs, [p.rango_bajo * 100 for p in orden], [p.rango_alto * 100 for p in orden],
-                      color=Palette.EMA, alpha=0.2, label="Intervalo ~80 %")
-    ejes.plot(xs, [p.rango_predicho * 100 for p in orden], color=Palette.EMA, linewidth=1.6, label="Predicho")
-    reales = [(x, p.rango_real * 100) for x, p in zip(xs, orden) if p.rango_real is not None]
-    if reales:
-        ejes.scatter([x for x, _v in reales], [v for _x, v in reales], color=Palette.TEXTO, s=18, zorder=3,
-                     label="Real")
-    marcas = xs[::max(1, len(xs) // 6)]
+    ejes.grid(False, axis="x")
+    n = len(orden)
+    ancho = _ANCHO_BARRA
+    for x, p in enumerate(orden):
+        ejes.bar(x, (p.rango_alto - p.rango_bajo) * 100, bottom=p.rango_bajo * 100, width=ancho, color=_BANDA, zorder=2)
+        ejes.hlines(p.rango_predicho * 100, x - ancho / 2, x + ancho / 2, color=Palette.EMA, linewidth=3, zorder=3)
+        if p.rango_real is not None:
+            dentro = p.rango_bajo <= p.rango_real <= p.rango_alto
+            ejes.scatter([x], [p.rango_real * 100], s=46, color="white", zorder=4,
+                         edgecolors="none" if dentro else Palette.ALERTA, linewidths=0 if dentro else 2)
+    centro = (n - 1) / 2                      # con pocas predicciones, el eje no se achica: quedan centradas
+    mitad = max(n, _COLUMNAS_MINIMAS) / 2 + 0.3
+    ejes.set_xlim(centro - mitad, centro + mitad)
+    ejes.set_ylim(0, max(p.rango_alto for p in orden) * 100 * 1.15)
+    marcas = list(range(0, n, max(1, n // 8)))
     ejes.set_xticks(marcas)
     ejes.set_xticklabels([textos.fecha(orden[x].generada_en)[:5] for x in marcas])
     ejes.yaxis.set_major_formatter(FuncFormatter(lambda v, _p: "%s %%" % ("%.1f" % v).replace(".", ",")))
-    ejes.legend(loc="lower left", bbox_to_anchor=(0, 1.0), ncol=3, frameon=False, labelcolor=Palette.TEXTO,
+    ejes.legend(handles=[Patch(color=_BANDA, label="Intervalo del 80 %"),
+                         Line2D([], [], color=Palette.EMA, linewidth=3, label="Rango predicho"),
+                         Line2D([], [], color="white", marker="o", linestyle="", markersize=7,
+                                label="Rango real (borde naranja si cayó fuera)")],
+                loc="lower left", bbox_to_anchor=(0, 1.0), ncol=3, frameon=False, labelcolor=Palette.TEXTO,
                 fontsize=Palette.TAMANO_TEXTO)
 
 
