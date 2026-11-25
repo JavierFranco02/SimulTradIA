@@ -64,6 +64,22 @@ class PruebasGraficosIA(unittest.TestCase):
             self.assertEqual(len(figura.axes[0].patches), len(historial))
             self.assertTrue(_png(figura).startswith(b"\x89PNG"))
 
+    def test_historial_el_punto_real_cabe_en_el_eje_y_las_marcas_no_se_repiten(self):
+        def prediccion(i, predicho, bajo, alto, real):
+            return PrediccionVolatilidad(1, 1, AHORA - timedelta(days=i), AHORA, Decimal(100), predicho, bajo, alto,
+                                         predicho, predicho, bajo, alto, NivelVolatilidad.NORMAL, rango_real=real)
+        # real (11,4 %) por encima de la banda: el techo del eje debe incluirlo
+        figura = Figure()
+        dibujar_historial(figura, [prediccion(1, 0.057, 0.04, 0.08, 0.114), prediccion(0, 0.055, 0.04, 0.08, 0.029)])
+        self.assertGreater(figura.axes[0].get_ylim()[1], 11.4)
+        # rangos muy chicos (0,1 %): las marcas del eje llevan los decimales que hagan falta y no se repiten
+        figura = Figure()
+        dibujar_historial(figura, [prediccion(1, 0.001, 0.0005, 0.0015, 0.001), prediccion(0, 0.001, 0.0005, 0.0015, None)])
+        _png(figura)
+        etiquetas = [t.get_text() for t in figura.axes[0].get_yticklabels() if t.get_text()]
+        self.assertEqual(len(etiquetas), len(set(etiquetas)))
+        self.assertTrue(any("0,0" in e for e in etiquetas))
+
     def test_ultimos_dias_con_y_sin_prediccion(self):
         p = PrediccionVolatilidad(1, 1, AHORA, AHORA, Decimal(100), 0.02, 0.015, 0.03, 0.02, 0.02, 0.01, 0.03,
                                   NivelVolatilidad.ALTA)

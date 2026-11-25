@@ -31,22 +31,23 @@ class SenalView(ttk.Frame):
         self._nombre.pack(anchor="w", pady=(0, Spacing.MD))
 
         ttk.Label(c, text=textos.explicacion_rango(), font=Fonts.SMALL, wraplength=900, justify="left").pack(
-            anchor="w", pady=(0, Spacing.SM))
+            anchor="w", pady=(0, Spacing.MD))
         resumen = ttk.Frame(c)
-        resumen.pack(fill="x", pady=(0, Spacing.MD))
+        resumen.pack(fill="x", pady=(0, Spacing.LG))
         self._nivel, self._frase = self._tarjeta(resumen, 0, "Mañana se espera un día", Fonts.DISPLAY)
         self._rango, self._intervalo = self._tarjeta(resumen, 1, "Rango esperado (máximo − mínimo)", Fonts.DISPLAY)
         self._veces, self._normal = self._tarjeta(resumen, 2, "Frente a lo normal", Fonts.DISPLAY)
 
-        conclusion = Seccion(c, "Últimos 30 días y mañana", "Cada barra es cuánto se movió el precio ese día.")
-        conclusion.pack(fill="x", pady=(0, Spacing.MD))
+        conclusion = Seccion(c, "Últimos 30 días y mañana", "Cada barra es cuánto se movió el precio ese día.",
+                             espaciado=Spacing.MD)
+        conclusion.pack(fill="x", pady=(0, Spacing.LG))
         self._grafico = FigureView(conclusion.cuerpo, dibujar_ultimos_dias, alto=260)
         self._grafico.pack(fill="x")
         self._referencia = ttk.Label(conclusion.cuerpo, text="", font=Fonts.SMALL)
         self._referencia.pack(anchor="w", pady=(Spacing.SM, 0))
 
         tres = ttk.Frame(c)
-        tres.pack(fill="x", pady=(0, Spacing.MD))
+        tres.pack(fill="x", pady=(0, Spacing.LG))
         self._cuadros = []
         for columna, titulo in enumerate(("Hoy se movió", "Lo normal", "Umbrales")):
             tres.columnconfigure(columna, weight=1, uniform="cuadro")
@@ -58,19 +59,19 @@ class SenalView(ttk.Frame):
             detalle.pack(anchor="w", pady=(Spacing.XS, 0))
             self._cuadros.append((valor, detalle))
 
-        self._seccion_factores = Seccion(c, "Qué datos pesaron en esta predicción", "")
+        self._seccion_factores = Seccion(
+            c, "Qué datos pesaron en esta predicción",
+            "A la derecha, en azul: el dato empuja a esperar un día más agitado. "
+            "A la izquierda, en naranja: a esperar uno más tranquilo.", espaciado=Spacing.MD)
         self._seccion_factores.pack(fill="x")
         cuerpo = self._seccion_factores.cuerpo
-        ttk.Label(cuerpo, font=Fonts.SMALL, wraplength=900, justify="left",
-                  text="A la derecha (azul): el dato empuja a esperar un día MÁS agitado. "
-                       "A la izquierda (naranja): a esperar uno más tranquilo.").pack(anchor="w", pady=(0, Spacing.XS))
         self._factores = BarList(cuerpo, centrada=True, ancho_texto=28)
         self._sin_factores = ttk.Label(cuerpo, text="Los factores no están disponibles para esta predicción.",
                                        font=Fonts.BODY)
         self._factores.pack(fill="x")
 
         self._seccion_uso = Seccion(c, "Cómo se puede usar", "")
-        self._seccion_uso.pack(fill="x", pady=(Spacing.MD, 0))
+        self._seccion_uso.pack(fill="x", pady=(Spacing.LG, 0))
         self._usos = []
         for _ in range(3):
             etiqueta = ttk.Label(self._seccion_uso.cuerpo, text="", font=Fonts.BODY, wraplength=900, justify="left")
