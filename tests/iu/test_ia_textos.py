@@ -7,6 +7,8 @@ from simultradia.domain.entities.prediccion_volatilidad_entity import Prediccion
 from simultradia.domain.enums import NivelVolatilidad as N
 from simultradia.analisis.volatilidad import NOMBRES_FEATURES
 from simultradia.iu.ia import textos
+from simultradia.ia.volatilidad import armar_dataset, entrenar
+from tests.ia.vol_fakes import crear_modelo_prueba, velas_vol
 
 _AHORA = datetime(2026, 11, 18, tzinfo=timezone.utc)
 
@@ -20,6 +22,19 @@ def _p(**cambios):
 
 
 class PruebasTextos(unittest.TestCase):
+    def test_decimales_solo_los_necesarios(self):
+        self.assertEqual("1 %", textos.rango(0.01))
+        self.assertEqual("0,5 %", textos.rango(0.005))
+        self.assertEqual("0,05 %", textos.rango(0.0005))
+        self.assertEqual("2,34 %", textos.rango(0.02341))
+        self.assertEqual("0,1 %", textos.rango(0.001))
+        self.assertNotIn("00", textos.rango(0.01))
+
+    def test_numero_justo_sin_menos_cero_y_con_signo(self):
+        self.assertEqual("0", textos.numero_justo(-0.001))
+        self.assertEqual("+0,05", textos.numero_justo(0.05, con_signo=True))
+        self.assertEqual("-2,6", textos.numero_justo(-2.6, con_signo=True))
+
     def test_numeros_con_coma_decimal(self):
         self.assertEqual(textos.pct(0.543), "54 %")
         self.assertEqual(textos.rango(0.023), "2,3 %")
@@ -80,9 +95,17 @@ class PruebasTextos(unittest.TestCase):
         self.assertEqual(textos.dia_de_vela(datetime(2026, 11, 23, 21, 0, tzinfo=local)), "lun 23/11")
         self.assertEqual(textos.dia_de_vela(datetime(2026, 11, 24, tzinfo=timezone.utc)), "lun 23/11")
 
+    def test_explicacion_del_veredicto_sin_parentesis_ni_comillas(self):
+        ev = entrenar(armar_dataset({i: velas_vol(700, i) for i in (1, 2)}), crear_modelo_prueba).evaluacion
+        texto = textos.explicacion_veredicto(ev, date(2021, 4, 1).toordinal(), date(2026, 11, 1).toordinal())
+        self.assertIn("abr 2021 a nov 2026", texto)
+        self.assertNotIn("(", texto)
+        self.assertNotIn("«", texto)
+
     def test_ejemplo_del_error(self):
         self.assertIn("2,0 %", textos.ejemplo_error(0.405465))
-        self.assertIn("±50 %", textos.ejemplo_error(0.405465))
+        self.assertIn("1,3 %", textos.ejemplo_error(0.405465))
+        self.assertNotIn("«", textos.ejemplo_error(0.405465))
         self.assertAlmostEqual(textos.siempre_normal(), 0.5)
 
     def test_resultado_del_registro(self):

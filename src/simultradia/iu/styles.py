@@ -130,3 +130,4 @@ def texto_normal(boton) -> None:
     justo después de crearlo: el estilo es compartido, así que afecta a todos los toggles de ese tipo."""
     estilo = ttk.Style()
     estilo.configure(boton.cget("style"), foreground=estilo.colors.fg)
+

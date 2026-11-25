@@ -39,9 +39,7 @@ class IAView(PanelView):
 
         cabecera = ttk.Frame(self)
         cabecera.pack(fill="x", pady=(0, Spacing.SM))
-        ttk.Label(cabecera, text="Predicciones IA · Volatilidad", font=Fonts.HEADING).pack(side="left")
-        ttk.Label(cabecera, text="Cuánto se moverá cada activo mañana (no hacia dónde)",
-                  font=Fonts.SUBTITLE).pack(side="left", padx=(Spacing.MD, 0))
+        ttk.Label(cabecera, text="Predicciones IA", font=Fonts.HEADING).pack(side="left")
 
         cuerpo = ttk.Frame(self)
         cuerpo.pack(fill="both", expand=True)
@@ -50,7 +48,7 @@ class IAView(PanelView):
         cuerpo.columnconfigure(1, weight=1)
 
         izquierda = ttk.Frame(cuerpo)
-        ttk.Label(izquierda, text="Escáner (por activo, de la A a la Z)", font=Fonts.VALUE).pack(anchor="w", pady=(0, Spacing.XS))
+        ttk.Label(izquierda, text="Escáner", font=Fonts.VALUE).pack(anchor="w", pady=(0, Spacing.XS))
         filtros = ttk.Frame(izquierda)
         filtros.pack(fill="x", pady=(0, Spacing.XS))
         self._filtro = tk.StringVar(master=self, value="todos")
@@ -96,7 +94,7 @@ class IAView(PanelView):
             self._pestanas.pack_forget()
             self._sin_modelo.configure(text="No hay un modelo de volatilidad activo.\n\nO todavía no se entrenó, o no "
                                             "superó a las dos bases (repetir el rango de hoy y el promedio de 20 "
-                                            "días). Un administrador puede entrenarlo en «Modelos de IA».")
+                                            "días). Un administrador puede entrenarlo en Modelos de IA.")
             self._sin_modelo.pack(expand=True)
             self._senales = []
             self._pintar_escaner()

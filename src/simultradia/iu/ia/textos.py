@@ -36,9 +36,21 @@ def pct(valor: float, decimales: int = 0) -> str:
     return ("%.*f" % (decimales, valor * 100)).replace(".", ",") + _ESPACIO + "%"
 
 
+def numero_justo(valor: float, decimales: int = 2, con_signo: bool = False) -> str:
+    """Hasta `decimales` decimales, y solo los que hacen falta: 2,0 -> «2»; 0,5 -> «0,5»; 0,05 -> «0,05»."""
+    texto = "%.*f" % (decimales, valor)
+    if "." in texto:
+        texto = texto.rstrip("0").rstrip(".")
+    if texto in ("0", "-0"):
+        texto = "0"
+    elif con_signo and valor > 0:
+        texto = "+" + texto
+    return texto.replace(".", ",")
+
+
 def rango(valor: float) -> str:
-    """Un rango diario (fracción del precio) con un decimal: 0,023 -> «2,3 %»."""
-    return pct(valor, 1)
+    """Un rango diario (fracción del precio), con los decimales que hagan falta (máximo 2): 0,023 -> «2,3 %»."""
+    return numero_justo(valor * 100) + _ESPACIO + "%"
 
 
 def numero(valor: float, decimales: int = 2, con_signo: bool = False) -> str:
@@ -89,8 +101,8 @@ def etiqueta_resultado(p: PrediccionVolatilidad) -> str:
 
 
 def explicacion_nivel() -> str:
-    return ("El nivel compara el rango esperado con los últimos %d días de ESTE activo: «baja» es del 25 %% más "
-            "tranquilo, «alta» del 25 %% más agitado y «normal» lo demás." % VENTANA_NIVEL)
+    return ("El nivel compara el rango esperado con los últimos %d días de ESTE activo: baja es el 25 %% más "
+            "tranquilo, alta el 25 %% más agitado y normal lo demás." % VENTANA_NIVEL)
 
 
 def explicacion_rango() -> str:
@@ -103,7 +115,7 @@ def frase_intervalo(p: PrediccionVolatilidad) -> str:
 
 
 def frase_normal(p: PrediccionVolatilidad) -> str:
-    return "Es %s (el promedio de %d días es %s)." % (veces(p.veces_lo_normal), VENTANA_NORMAL, rango(p.rango_normal))
+    return "Es %s; el promedio de %d días es %s." % (veces(p.veces_lo_normal), VENTANA_NORMAL, rango(p.rango_normal))
 
 
 def dias(n: int) -> str:
@@ -212,22 +224,22 @@ def titulo_veredicto(ev: Evaluacion) -> str:
 
 
 def explicacion_veredicto(ev: Evaluacion, inicio_ordinal: int, fin_ordinal: int) -> str:
-    probado = ("probado en %d periodos del pasado con datos que no había visto (%s)" % (
-        len(ev.tramos), periodo(inicio_ordinal, fin_ordinal)))
+    probado = "Probado en %d periodos, de %s, con datos que el modelo no había visto." % (
+        len(ev.tramos), periodo(inicio_ordinal, fin_ordinal).replace(" – ", " a "))
     if ev.supera_base:
-        return ("Predice mejor el rango del día que las dos alternativas simples, %s. Por eso queda activo." % probado)
+        return "Predice mejor el rango del día que las dos alternativas simples. %s Por eso queda activo." % probado
     if ev.z_hoy >= Z_MINIMO or ev.z_media >= Z_MINIMO:
-        return ("Le gana a una de las dos alternativas simples pero no a la otra, %s. No alcanza para activarlo." %
+        return ("Le gana a una de las dos alternativas simples pero no a la otra. %s No alcanza para activarlo." %
                 probado)
-    return ("No le gana con claridad a las alternativas simples, %s: la diferencia podría ser casualidad. "
+    return ("No le gana con claridad a las alternativas simples: la diferencia podría ser casualidad. %s "
             "No se activa." % probado)
 
 
 def ejemplo_error(error_log: float) -> str:
-    """Qué significa «±38 %» con un caso concreto: un día de 2,0 %."""
+    """Qué significa el error medio con un caso concreto: un día de 2,0 %."""
     f = math.exp(error_log)
-    return ("«%s» quiere decir: si un día el rango real es 2,0 %%, el modelo suele haber predicho entre %s y %s." % (
-        error_pct(error_log), rango(0.02 / f), rango(0.02 * f)))
+    return "Ejemplo: si un día el rango real es 2,0 %%, el modelo suele haber predicho entre %s y %s." % (
+        pct(0.02 / f, 1), pct(0.02 * f, 1))
 
 
 def tramos_ganados(ev: Evaluacion) -> int:
@@ -240,7 +252,7 @@ def siempre_normal() -> float:
 
 
 def lectura_nivel(ev: Evaluacion) -> str:
-    return ("Acertar el nivel es difícil: el modelo %s a decir siempre «normal», porque la mitad de los días lo son. "
+    return ("Acertar el nivel es difícil: el modelo %s a decir siempre normal, porque la mitad de los días lo son. "
             "Fíate más del número del rango, que es lo que realmente se evalúa." % (
                 "apenas supera" if ev.acierto_nivel > siempre_normal() else "no supera"))
 
@@ -269,7 +281,7 @@ def diferencia_pp(p: PrediccionVolatilidad) -> str:
     """Real menos predicho, en puntos porcentuales: «+0,3 pp»."""
     if p.rango_real is None:
         return "—"
-    return numero((p.rango_real - p.rango_predicho) * 100, 1, con_signo=True) + " pp"
+    return numero_justo((p.rango_real - p.rango_predicho) * 100, con_signo=True) + " pp"
 
 
 def niveles(p: PrediccionVolatilidad) -> str:

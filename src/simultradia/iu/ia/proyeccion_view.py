@@ -9,7 +9,7 @@ import tkinter as tk
 import ttkbootstrap as ttk
 
 from simultradia.analisis.montecarlo import Proyeccion
-from simultradia.iu.components import ActionButton, FigureView, MetricGrid
+from simultradia.iu.components import ActionButton, FigureView, MetricGrid, Seccion
 from simultradia.iu.formato import precio
 from simultradia.iu.ia import textos
 from simultradia.iu.ia.graficos import dibujar_proyeccion
@@ -35,10 +35,12 @@ class ProyeccionView(ttk.Frame):
         self._contenido = ttk.Frame(self)
         self._metricas = MetricGrid(self._contenido, columnas=4)
         self._metricas.pack(fill="x", pady=(Spacing.MD, 0))
-        self._grafico = FigureView(self._contenido, dibujar_proyeccion)
+        seccion = Seccion(self._contenido, "Precios posibles",
+                          "Dispersión según la volatilidad reciente. No es la predicción de la IA.",
+                          espaciado=Spacing.MD)
+        seccion.pack(fill="both", expand=True, pady=(Spacing.LG, 0))
+        self._grafico = FigureView(seccion.cuerpo, dibujar_proyeccion)
         self._grafico.pack(fill="both", expand=True)
-        ttk.Label(self._contenido, text="Dispersión según la volatilidad reciente: no es la predicción de la IA.",
-                  font=Fonts.SMALL).pack(anchor="w", pady=(Spacing.SM, 0))
 
     def vincular_acciones(self, al_calcular: Callable[[], None]) -> None:
         self._al_calcular = al_calcular
