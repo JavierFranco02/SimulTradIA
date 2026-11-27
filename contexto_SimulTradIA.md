@@ -425,7 +425,7 @@ El paquete se llama **`simultradia`** (no `main`: chocaría con `main.py`).
     estiraría el eje y aplastaría la curva). El eje horizontal es TIEMPO REAL, con marcas en horas o días redondos y sus
     etiquetas bajo CADA panel: si las marcas distan menos de un día, la hora («15:00») y, al cambiar el día, debajo la fecha
     («15 nov»); si distan un día o más, la fecha y, al cambiar el año, el año. La línea de datos al pasar el mouse trae fecha, hora,
-    patrimonio, saldo y posiciones. El rango solo cambia cómo se dibuja (no pide nada al servicio).
+    patrimonio, saldo y posiciones. El rango solo cambia cómo se dibuja (no pide nada al servicio). Con menos de 2 puntos no hay curva: se escribe `mensaje_vacio`, parámetro de `EquityChart` y de `dibujar_curva` con un texto genérico por omisión («No hay puntos suficientes.», `MENSAJE_SIN_PUNTOS`); cada pantalla puede poner uno propio que explique su contexto (Portafolio: «Aún no hay historial del patrimonio. Deja correr el worker unos minutos.») y cambiarlo después con `establecer_mensaje_vacio`.
   - `PortafolioController` pide el resumen cada 15 s, una consulta a la vez; el fallo repetido se avisa una sola vez.
 
 ### 4.4 Para agregar una pantalla

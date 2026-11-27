@@ -101,14 +101,19 @@ def _porcentaje_eje(valor: float, _posicion) -> str:
     return porcentaje(Decimal(str(round(0.0 if abs(valor) < 1e-9 else valor, 2))))
 
 
+MENSAJE_SIN_PUNTOS = "No hay puntos suficientes."
+
+
 def dibujar_curva(figura, puntos: Sequence[SnapshotPortafolio], caidas: Sequence[float],
-                  capital_inicial: Decimal, horas: Optional[int] = None) -> Optional[Dibujo]:
+                  capital_inicial: Decimal, horas: Optional[int] = None,
+                  mensaje_vacio: str = MENSAJE_SIN_PUNTOS) -> Optional[Dibujo]:
     """Redibuja todo. `puntos` y `caidas` (del mismo largo) vienen del servicio; se muestran los de las
-    últimas `horas` (None = toda la historia)."""
+    últimas `horas` (None = toda la historia). Con menos de 2 puntos no hay curva que dibujar: en su lugar se
+    escribe `mensaje_vacio` (genérico por omisión; cada pantalla puede poner uno que explique su contexto)."""
     figura.clear()
     figura.set_facecolor(Palette.FONDO)
     if puntos is None or len(puntos) < 2:
-        figura.text(0.5, 0.5, "Aún no hay historial del patrimonio.\nDeja correr el worker unos minutos.",
+        figura.text(0.5, 0.5, mensaje_vacio,
                     ha="center", va="center", color=Palette.TEXTO, fontsize=Palette.TAMANO_TEXTO + 2)
         return None
 
