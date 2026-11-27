@@ -16,7 +16,7 @@ from simultradia.iu.styles import Fonts
 
 
 class App(ttk.Window):
-    def __init__(self, servicios: Servicios):
+    def __init__(self, servicios: Servicios, usuario_debug=None):  # DEBUG: + usuario_debug
         super().__init__(
             title=SETTINGS.app.name,
             themename="darkly",        # oscuros: darkly, superhero. Claros: flatly, litera
@@ -25,6 +25,11 @@ class App(ttk.Window):
         iniciar_revision(self)     # activa la entrega de resultados de los hilos
 
         # La única sesión de la app: se entrega a quien la necesite.
-        self._navegador = Navegador(self, servicios, Session())
+        session = Session()
+        self._navegador = Navegador(self, servicios, session)
         registrar_pantallas(self._navegador)
-        self._navegador.ir_a("login")
+        if usuario_debug is not None:  # DEBUG
+            session.iniciar(usuario_debug)  # DEBUG
+            self._navegador.ir_a("home")  # DEBUG
+        else:  # DEBUG
+            self._navegador.ir_a("login")
