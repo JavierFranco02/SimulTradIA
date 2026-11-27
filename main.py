@@ -10,9 +10,10 @@ from tkinter import messagebox
 from simultradia.app import App
 from simultradia.composition import crear_servicios
 from simultradia.core.db import Database
-from simultradia.core.exceptions import ErrorBaseDatos
+from simultradia.core.exceptions import ErrorBaseDatos, ErrorOperacionInvalida  # DEBUG: + ErrorOperacionInvalida
 from simultradia.core.logging_config import configurar_logging
 from simultradia.core.settings import SETTINGS
+from simultradia.debug_login import usuario_debug_desde_argumentos  # DEBUG
 
 
 def main() -> int:
@@ -27,7 +28,11 @@ def main() -> int:
         return 1
 
     try:
-        App(crear_servicios(db)).mainloop()
+        usuario_debug = usuario_debug_desde_argumentos(db)  # DEBUG
+        App(crear_servicios(db), usuario_debug).mainloop()  # DEBUG: + usuario_debug
+    except ErrorOperacionInvalida as error:  # DEBUG
+        print("Error: %s" % error)  # DEBUG
+        return 1  # DEBUG
     finally:
         db.cerrar()
     return 0
