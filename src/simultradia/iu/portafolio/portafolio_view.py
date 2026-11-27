@@ -24,6 +24,7 @@ from simultradia.services.portafolio_service import ResumenPortafolio
 
 _RANGOS = (("1 día", 24), ("1 sem", 168), ("1 mes", 720), ("Todo", None))     # texto del botón -> horas a mostrar
 _RANGO_INICIAL = "1 día"
+_MENSAJE_SIN_HISTORIAL = "Aún no hay historial del patrimonio.\nDeja correr el worker unos minutos."
 _CIFRAS = (("patrimonio", "Patrimonio"), ("rentabilidad", "Rentabilidad"), ("saldo", "Saldo disponible"),
            ("posiciones", "En posiciones"), ("no_realizado", "P&L no realizado"), ("realizado", "P&L realizado"))
 _COLUMNAS_METRICAS = (
@@ -101,7 +102,8 @@ class PortafolioView(PanelView):
                                     command=self._pulsar_rango, bootstyle=ButtonStyle.TOGGLE)
             boton.pack(side="left", padx=(0, Spacing.XS))
             texto_normal(boton)
-        self._grafico = EquityChart(izquierda, horas=dict(_RANGOS)[_RANGO_INICIAL])
+        self._grafico = EquityChart(izquierda, mensaje_vacio=_MENSAJE_SIN_HISTORIAL,
+                                    horas=dict(_RANGOS)[_RANGO_INICIAL])
         self._grafico.pack(fill="both", expand=True, pady=(Spacing.SM, 0))
 
     # ------------------------------------------- lo que el controlador ordena

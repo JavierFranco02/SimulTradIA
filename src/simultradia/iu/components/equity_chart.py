@@ -1,8 +1,13 @@
 """Gráfico de la curva de capital para la interfaz: pone la figura de matplotlib dentro de tkinter.
 
     grafico = EquityChart(padre, horas=24)                         # rango inicial: las últimas 24 horas
+    grafico = EquityChart(padre, mensaje_vacio="Aún no hay historial.")     # o con un mensaje propio para «sin curva»
     grafico.establecer_datos(puntos, caidas, capital_inicial)      # lo que entrega PortafolioService
     grafico.establecer_rango(168)                                  # solo las últimas 168 horas (None = todo)
+    grafico.establecer_mensaje_vacio("Sin datos todavía.")         # cambia lo que se ve cuando no hay curva
+
+`mensaje_vacio` es lo que se escribe en el lugar del gráfico cuando hay menos de 2 puntos. Por omisión es un texto
+genérico («No hay puntos suficientes.»); cada pantalla puede poner uno que explique por qué falta la curva.
 
 Al pasar el mouse sobre la curva, arriba a la izquierda se leen la fecha y hora del punto y su patrimonio, saldo y
 posiciones. Cada actualización redibuja todo: con unos miles de puntos es rápido.
@@ -15,13 +20,14 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
 from simultradia.domain.entities.snapshot_entity import SnapshotPortafolio
-from simultradia.iu.components.equity_render import Dibujo, dibujar_curva, texto_de_punto
+from simultradia.iu.components.equity_render import MENSAJE_SIN_PUNTOS, Dibujo, dibujar_curva, texto_de_punto
 from simultradia.iu.styles import Palette
 
 
 class EquityChart(ttk.Frame):
-    def __init__(self, parent, horas: Optional[int] = None):
+    def __init__(self, parent, horas: Optional[int] = None, mensaje_vacio: str = MENSAJE_SIN_PUNTOS):
         super().__init__(parent)
+        self._mensaje_vacio = mensaje_vacio
         self._figura = Figure(facecolor=Palette.FONDO)
         self._lienzo = FigureCanvasTkAgg(self._figura, master=self)
         widget = self._lienzo.get_tk_widget()
@@ -46,13 +52,20 @@ class EquityChart(ttk.Frame):
         self._horas = horas
         self._redibujar()
 
+    def establecer_mensaje_vacio(self, mensaje: str) -> None:
+        """Cambia el texto que se ve cuando no hay curva (y lo redibuja si ya se mostraba)."""
+        self._mensaje_vacio = mensaje
+        if self._puntos is not None:
+            self._redibujar()
+
     def limpiar(self) -> None:
         self._puntos, self._dibujo = None, None
         self._figura.clear()
         self._lienzo.draw_idle()
 
     def _redibujar(self) -> None:
-        self._dibujo = dibujar_curva(self._figura, self._puntos, self._caidas, self._capital, self._horas)
+        self._dibujo = dibujar_curva(self._figura, self._puntos, self._caidas, self._capital, self._horas,
+                                     self._mensaje_vacio)
         self._indice_texto = None
         self._lienzo.draw_idle()
 

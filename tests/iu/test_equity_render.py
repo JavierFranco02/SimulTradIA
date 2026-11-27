@@ -10,7 +10,7 @@ from matplotlib.figure import Figure
 from simultradia.analisis.metricas import caidas
 from simultradia.domain.entities.snapshot_entity import SnapshotPortafolio
 from simultradia.iu.components.equity_render import (
-    dibujar_curva, etiquetas_eje_x, marcas_eje_x, texto_de_punto)
+    MENSAJE_SIN_PUNTOS, dibujar_curva, etiquetas_eje_x, marcas_eje_x, texto_de_punto)
 
 INICIO = datetime(2026, 11, 1, 0, 0, tzinfo=timezone.utc)
 
@@ -70,11 +70,17 @@ class PruebasDibujo(unittest.TestCase):
         textos = [t.get_text() for t in figura.axes[1].get_xticklabels()]
         self.assertTrue(all(re.match(r"^\d{1,2} [a-z]{3}", t) for t in textos))
 
-    def test_con_menos_de_dos_puntos_muestra_un_aviso_y_no_falla(self):
+    def test_con_menos_de_dos_puntos_muestra_el_mensaje_generico_y_no_falla(self):
         for puntos in ([], _puntos(1), None):
             figura = Figure()
             self.assertIsNone(dibujar_curva(figura, puntos, [], D("10000")))
+            self.assertEqual([t.get_text() for t in figura.texts], [MENSAJE_SIN_PUNTOS])
             self.assertTrue(self._png(figura))
+
+    def test_el_mensaje_sin_curva_se_puede_cambiar_segun_el_contexto(self):
+        figura = Figure()
+        dibujar_curva(figura, [], [], D("10000"), mensaje_vacio="Sin datos de prueba")
+        self.assertEqual([t.get_text() for t in figura.texts], ["Sin datos de prueba"])
 
     def test_la_escala_se_ajusta_a_lo_que_se_ve_y_no_empieza_en_cero(self):
         # patrimonio entre ~9 900 y ~10 100; el capital inicial (1 000) queda muy lejos: no debe estirar el eje
